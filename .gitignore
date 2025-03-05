@@ -1,1 +1,10 @@
 Biznesa Plans
+__pycache__/
+*.py[cod]
+*$py.class
+
+.idea/
+.env
+poetry.lock
+.coverage
+coverage.xml

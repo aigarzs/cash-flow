@@ -1,0 +1,268 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>800</width>
+    <height>600</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Naudas plūsma</string>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <layout class="QVBoxLayout" name="verticalLayout">
+    <item>
+     <widget class="QSplitter" name="splitter">
+      <property name="orientation">
+       <enum>Qt::Horizontal</enum>
+      </property>
+      <widget class="QToolBox" name="toolBox">
+       <property name="minimumSize">
+        <size>
+         <width>100</width>
+         <height>0</height>
+        </size>
+       </property>
+       <property name="maximumSize">
+        <size>
+         <width>200</width>
+         <height>16777215</height>
+        </size>
+       </property>
+       <property name="baseSize">
+        <size>
+         <width>200</width>
+         <height>0</height>
+        </size>
+       </property>
+       <property name="currentIndex">
+        <number>3</number>
+       </property>
+       <widget class="QWidget" name="page_customers">
+        <property name="geometry">
+         <rect>
+          <x>0</x>
+          <y>0</y>
+          <width>142</width>
+          <height>167</height>
+         </rect>
+        </property>
+        <attribute name="label">
+         <string>Ienākumi</string>
+        </attribute>
+        <layout class="QVBoxLayout" name="verticalLayout_2">
+         <item>
+          <widget class="QPushButton" name="button_Customers">
+           <property name="text">
+            <string>Klienti</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="button_CustomersInvoicesCleared">
+           <property name="text">
+            <string>Apmaksātie rēķini</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="button_CustomersInvoicesUncleared">
+           <property name="text">
+            <string>Neapmaksātie rēķini</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="button_CustomersPayments">
+           <property name="text">
+            <string>Maksājumi</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="button_CustomersCreditnotes">
+           <property name="text">
+            <string>Kredītrēķini</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+       <widget class="QWidget" name="page_vendors">
+        <property name="geometry">
+         <rect>
+          <x>0</x>
+          <y>0</y>
+          <width>142</width>
+          <height>167</height>
+         </rect>
+        </property>
+        <attribute name="label">
+         <string>Maksājumi</string>
+        </attribute>
+        <layout class="QVBoxLayout" name="verticalLayout_5">
+         <item>
+          <widget class="QPushButton" name="button_Vendors">
+           <property name="text">
+            <string>Piegādātāji</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="button_VendorsInvoicesCleared">
+           <property name="text">
+            <string>Apmaksātie rēķini</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="button_VendorsInvoicesUncleared">
+           <property name="text">
+            <string>Neapmaksātie rēķini</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="button_VendorsPayments">
+           <property name="text">
+            <string>Maksājumi</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="button_VendorsCreditnotes">
+           <property name="text">
+            <string>Kredītrēķini</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+       <widget class="QWidget" name="page_cashflow">
+        <property name="geometry">
+         <rect>
+          <x>0</x>
+          <y>0</y>
+          <width>167</width>
+          <height>167</height>
+         </rect>
+        </property>
+        <attribute name="label">
+         <string>Naudas plūsma</string>
+        </attribute>
+        <layout class="QVBoxLayout" name="verticalLayout_3">
+         <item>
+          <widget class="QPushButton" name="button_CashFlowDefinition">
+           <property name="text">
+            <string>Struktūras definēšana</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="button_CashFlowBudget">
+           <property name="text">
+            <string>Budžets</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="button_CashFlowReport">
+           <property name="text">
+            <string>Naudas plūsmas atskaite</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="button_CashFlowGraph">
+           <property name="text">
+            <string>Naudas plūsmas grafiks</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="button_Demo">
+           <property name="text">
+            <string>Demo</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+       <widget class="QWidget" name="page_Settings">
+        <property name="geometry">
+         <rect>
+          <x>0</x>
+          <y>0</y>
+          <width>200</width>
+          <height>414</height>
+         </rect>
+        </property>
+        <attribute name="label">
+         <string>Uzstādījumi</string>
+        </attribute>
+        <layout class="QVBoxLayout" name="verticalLayout_4">
+         <item>
+          <widget class="QPushButton" name="pushButton">
+           <property name="text">
+            <string>Datubāze</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="pushButton_3">
+           <property name="text">
+            <string>Datu avoti</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="pushButton_2">
+           <property name="text">
+            <string>Lietotāji</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="button_Accounts">
+           <property name="text">
+            <string>Kontu plāns</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+      </widget>
+      <widget class="QTabWidget" name="tabWidget">
+       <property name="tabShape">
+        <enum>QTabWidget::Rounded</enum>
+       </property>
+       <property name="currentIndex">
+        <number>-1</number>
+       </property>
+       <property name="tabsClosable">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QMenuBar" name="menubar">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>800</width>
+     <height>22</height>
+    </rect>
+   </property>
+  </widget>
+  <widget class="QStatusBar" name="statusbar"/>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
