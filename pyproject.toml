@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "cash-flow"
+version = "0.1.0"
+description = ""
+authors = ["Aigars Sinevics <aigarzs@gmail.com>"]
+readme = "README.md"
+packages = [{include = "cash_flow"}]
+
+[tool.poetry.dependencies]
+python = "3.9.20"
+pyqt6 = "6.4.2"
+pyqt6-tools = "^6.4.2.3.3"
+sqlalchemy = "^2.0.35"
+faker = "^29.0.0"
+pandas = "^2.2.3"
+jupyter = "^1.1.1"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
