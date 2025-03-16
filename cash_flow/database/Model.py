@@ -1,5 +1,5 @@
 from sqlalchemy import Integer, String, DateTime, Numeric, ForeignKey, event, \
-    text, Boolean
+    text, Boolean, Float
 from sqlalchemy.orm import DeclarativeBase, mapped_column, relationship
 
 from cash_flow.database.Views import views_all
@@ -173,9 +173,9 @@ class Document(Base):
     customer_id = mapped_column(ForeignKey("B04_Customers.id"), nullable=True)
     vendor_id = mapped_column(ForeignKey("B05_Vendors.id"), nullable=True)
     description = mapped_column(String(255), nullable=False)
-    amount = mapped_column(Numeric(12,2), nullable=False)
+    amount = mapped_column(Numeric(12,2, 2), nullable=False)
     currency  = mapped_column(ForeignKey("B01_Currencies.code"), nullable=False)
-    amount_LC = mapped_column(Numeric(12, 2), nullable=False)
+    amount_LC = mapped_column(Numeric(12, 2, 2), nullable=False)
     memo = mapped_column(String)
     cleared = mapped_column(Boolean, nullable=False, default=0)
     cleared_amount = mapped_column(Numeric(12, 2), nullable=False, default=0)
@@ -229,10 +229,10 @@ class GeneralLedger(Base):
     __tablename__ = "D03_GeneralLedger"
     id = mapped_column(Integer, primary_key=True)
     document_id = mapped_column(ForeignKey("D01_Documents.id", ondelete="CASCADE"), nullable=False)
-    entry_type = mapped_column(String(2), nullable=False)
-    account = mapped_column(ForeignKey("B02_Accounts.code"), nullable=False)
-    amount = mapped_column(Numeric(12,2), nullable=False)
-    amount_LC = mapped_column(Numeric(12,2), nullable=False)
+    entry_type = mapped_column(String(2), nullable=False, index=True)
+    account = mapped_column(ForeignKey("B02_Accounts.code"), nullable=False, index=True)
+    amount = mapped_column(Numeric(12,2, 2), nullable=False)
+    amount_LC = mapped_column(Numeric(12,2, 2), nullable=False)
     document = relationship("Document", back_populates="gl")
 
 class Reconciliation(Base):
@@ -246,6 +246,26 @@ class Reconciliation(Base):
     source_id = mapped_column(ForeignKey("A02_Sources.id", ondelete="CASCADE"),
                               nullable=False)
     source_key = mapped_column(String(30), nullable=False)
+
+class PlannedAnonymousOperation(Base):
+    __tablename__ = "D05_PlannedAnonymousOperations"
+    id = mapped_column(Integer, primary_key=True)
+    name = mapped_column(String(100), nullable=True)
+
+class PlannedAnonymousAccount(Base):
+    __tablename__ = "D06_PlannedAnonymousAccounts"
+    id = mapped_column(Integer, primary_key=True)
+    operation_id = mapped_column(ForeignKey("D05_PlannedAnonymousOperations.id", ondelete="CASCADE"), nullable=False)
+    entry_type = mapped_column(String(2), nullable=True, index=True)
+    account = mapped_column(ForeignKey("B02_Accounts.code"), nullable=True, index=True)
+    fraction = mapped_column(Float, nullable=True)
+
+class PlannedAnonymousAmount(Base):
+    __tablename__ = "D07_PlannedAnonymousAmounts"
+    id = mapped_column(Integer, primary_key=True)
+    operation_id = mapped_column(ForeignKey("D05_PlannedAnonymousOperations.id", ondelete="CASCADE"), nullable=False)
+    date = mapped_column(DateTime, nullable=True, index=True)
+    amount_LC = mapped_column(Numeric(12, 2, 2), nullable=True)
 
 class CashFlowDefinition(Base):
     __tablename__ = "E01_CashFlowDefinition"
@@ -295,7 +315,7 @@ def default_data_doc_types(target, connection, **kw):
 
     connection.execute(text(sql), params)
 
-class CashFlowDefinitionAccounts(Base):
+class CashFlowDefinitionAccount(Base):
     __tablename__ = "E01_CashFlowDefinitionAccounts"
     id = mapped_column(Integer, primary_key=True)
     definition_id = mapped_column(ForeignKey("E01_CashFlowDefinition.id"), nullable=True)
@@ -303,13 +323,13 @@ class CashFlowDefinitionAccounts(Base):
     entry_type = mapped_column(String(2), nullable=True)
     account = mapped_column(ForeignKey("B02_Accounts.code"), nullable=True)
 
-class CashFlowDefinitionTotals(Base):
+class CashFlowDefinitionTotal(Base):
     __tablename__ = "E01_CashFlowDefinitionTotals"
     id = mapped_column(Integer, primary_key=True)
     definition_id = mapped_column(ForeignKey("E01_CashFlowDefinition.id"), nullable=True)
     operator = mapped_column(String(1), nullable=True)
     definition_summarized = mapped_column(ForeignKey("E01_CashFlowDefinition.id"), nullable=True)
 
-@event.listens_for(CashFlowDefinitionTotals.metadata, "after_create")
+@event.listens_for(CashFlowDefinitionTotal.metadata, "after_create")
 def create_views(target, connection, **kw):
     views_all(connection)

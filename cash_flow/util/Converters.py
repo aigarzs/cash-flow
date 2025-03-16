@@ -1,5 +1,5 @@
 from datetime import datetime, date
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 import numpy as np
 import pandas as pd
 
@@ -54,6 +54,21 @@ def various_to_integer(value):
         return int(float(value))
     except:
         return 0
+
+def various_to_float(value):
+    try:
+        return float(value)
+    except:
+        return 0.0
+
+def various_to_decimal(value):
+    # Define the scale (e.g., 2 decimal places)
+    scale = Decimal('0.01')  # Equivalent to rounding to 2 decimal places
+
+    try:
+        return Decimal(float(value)).quantize(scale, rounding=ROUND_HALF_UP)
+    except:
+        return Decimal(0.00).quantize(scale, rounding=ROUND_HALF_UP)
 
 
 if __name__ == "__main__":

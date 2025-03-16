@@ -194,7 +194,7 @@ class ATableModel(QAbstractTableModel):
             # print(type(value) , " " , value)
             if value is None:
                 return ""
-            elif type(value) in (Decimal, float):
+            elif type(value) ==  Decimal:
                 return decimal_format().format(value)
             elif type(value) in (date, datetime):
                 return value.strftime(date_format())
@@ -208,7 +208,7 @@ class ATableModel(QAbstractTableModel):
                 return Qt.CheckState.Checked if value else Qt.CheckState.Unchecked
 
         elif role == Qt.ItemDataRole.EditRole:
-            if type(value) in (Decimal, float):
+            if type(value) == Decimal:
                 return decimal_format().format(value)
             elif value is None:
                 return ""
