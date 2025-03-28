@@ -1,8 +1,8 @@
 import pandas as pd
 
-print("Importing pandas settings....")
-print("pd.options.mode.copy_on_write = True")
+print("******** pandas settings ********")
 pd.options.mode.copy_on_write = True
-print("Setting up alchemy")
-print("Engine echo=True")
-engine_echo = True
+print(f"pd.options.mode.copy_on_write={pd.options.mode.copy_on_write}")
+print("******** alchemy settings ********")
+engine_echo = False
+print(f"Engine echo={engine_echo}")

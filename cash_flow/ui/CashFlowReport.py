@@ -2,10 +2,12 @@ from datetime import date, datetime
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QBrush
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QDateEdit, QLabel, QComboBox
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QDateEdit, QLabel, QComboBox, QPushButton, QFileDialog
 
 import pandas as pd
 import numpy as np
+from openpyxl.reader.excel import load_workbook
+from openpyxl.styles import Alignment, PatternFill, Font
 
 from cash_flow.ui.AWidgets import ATable, ATableModel
 from cash_flow.util.Converters import date_format
@@ -18,6 +20,11 @@ class CashFlowReport(QWidget):
         super().__init__(parent)
         self.engine = engine
         vbox = QVBoxLayout()
+        toolbox = QHBoxLayout()
+        btn_excel = QPushButton("Export to Excel")
+        btn_excel.clicked.connect(self.export_to_excel)
+        toolbox.addStretch()
+        toolbox.addWidget(btn_excel)
         filterbox_from = QHBoxLayout()
         filterbox_through = QHBoxLayout()
         filterbox_freq = QHBoxLayout()
@@ -57,6 +64,7 @@ class CashFlowReport(QWidget):
         self.table = ATable()
         self.table.setModel(CashFlowReportModel(self.table, self.engine))
 
+        vbox.addLayout(toolbox)
         vbox.addWidget(label_filter)
         vbox.addLayout(filterbox_from)
         vbox.addLayout(filterbox_through)
@@ -73,6 +81,43 @@ class CashFlowReport(QWidget):
                                        "date through": self.filter_dateThrough.date().toPyDate(),
                                        "frequency": freq})
 
+    def export_to_excel(self):
+        file_name, _ = QFileDialog.getSaveFileName(self, "Save Excel File", "", "Excel Files (*.xlsx);;All Files (*)")
+
+        if file_name:
+            if not file_name.endswith(".xlsx"):
+                file_name += ".xlsx"
+            # Save DataFrame to Excel
+            self.table.model().DATA.to_excel(file_name, index=True)
+
+            # Load workbook for formatting
+            wb = load_workbook(file_name)
+            ws = wb.active
+
+            # Align entire first column (Index) to left
+            for row in range(1, ws.max_row + 1):
+                ws.cell(row=row, column=1).alignment = Alignment(horizontal="left")
+
+            # Formatting row colors
+            dark_blue_fill = PatternFill(start_color="00008B", end_color="00008B", fill_type="solid")
+            dark_cyan_fill = PatternFill(start_color="008B8B", end_color="008B8B", fill_type="solid")
+            # Define font for white text
+            white_font = Font(color="FFFFFF")
+
+            row = 1 # First row for column headers
+            for def_type in self.table.model().FORMAT:
+                row = row + 1
+                if def_type == 2:  # Totals
+                    for cell in ws[row]:
+                        cell.fill = dark_blue_fill
+                        cell.font = white_font
+                elif def_type == 3:  # Balances
+                    for cell in ws[row]:
+                        cell.fill = dark_cyan_fill
+                        cell.font = white_font
+
+            wb.save(file_name)
+            print(f"Data exported to {file_name} with formatting.")
 
 class CashFlowReportModel(ATableModel):
 
