@@ -117,7 +117,7 @@ class CashFlowReport(QWidget):
                         cell.font = white_font
 
             wb.save(file_name)
-            print(f"Data exported to {file_name} with formatting.")
+            # print(f"Data exported to {file_name} with formatting.")
 
 class CashFlowReportModel(ATableModel):
 
