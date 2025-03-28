@@ -426,6 +426,8 @@ def view_bank_receipts_planned(connection):
     connection.execute(text(drop))
     connection.execute(text(create))
 
+
+
 if __name__ == "__main__":
     with engine.connect() as connection:
         views_all(connection)

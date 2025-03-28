@@ -39,14 +39,14 @@ def str_to_priority(priority_string):
 
 def pandas_to_python(value):
     """Convert a Pandas or NumPy value to a native Python type."""
+    if pd.isna(value) or pd.isnull(value):
+        return None
     if isinstance(value, np.generic):  # Convert NumPy scalar types
         return value.item()
     elif isinstance(value, pd.Timestamp):  # Convert Pandas Timestamp to Python datetime
-        return value.to_pydatetime() if not pd.isna(value) else None
+        return value.to_pydatetime()
     elif isinstance(value, pd.Timedelta):  # Convert Pandas Timedelta to Python timedelta
         return value.to_pytimedelta()
-    elif pd.isna(value):  # Handles NaN, None, pd.NA, pd.NaT
-        return None
     return value  # Return as-is for other Python-native types
 
 def various_to_integer(value):

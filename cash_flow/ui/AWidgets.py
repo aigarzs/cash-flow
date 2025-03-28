@@ -194,7 +194,7 @@ class ATableModel(QAbstractTableModel):
             # print(type(value) , " " , value)
             if value is None:
                 return ""
-            elif type(value) ==  Decimal:
+            elif type(value) in (Decimal, float):
                 return decimal_format().format(value)
             elif type(value) in (date, datetime):
                 return value.strftime(date_format())

@@ -47,8 +47,8 @@
          <rect>
           <x>0</x>
           <y>0</y>
-          <width>142</width>
-          <height>167</height>
+          <width>200</width>
+          <height>414</height>
          </rect>
         </property>
         <attribute name="label">
@@ -97,8 +97,8 @@
          <rect>
           <x>0</x>
           <y>0</y>
-          <width>142</width>
-          <height>167</height>
+          <width>200</width>
+          <height>414</height>
          </rect>
         </property>
         <attribute name="label">
@@ -184,6 +184,13 @@
           </widget>
          </item>
          <item>
+          <widget class="QPushButton" name="button_Budget">
+           <property name="text">
+            <string>Budžets</string>
+           </property>
+          </widget>
+         </item>
+         <item>
           <widget class="QPushButton" name="button_Demo">
            <property name="text">
             <string>Demo</string>
@@ -197,8 +204,8 @@
          <rect>
           <x>0</x>
           <y>0</y>
-          <width>98</width>
-          <height>136</height>
+          <width>200</width>
+          <height>414</height>
          </rect>
         </property>
         <attribute name="label">

@@ -5,6 +5,7 @@ from PyQt6.QtWidgets import QApplication
 
 import cash_flow.util.Settings
 from cash_flow.database.AEngine import engine
+from cash_flow.ui.Budget import Budget
 from cash_flow.ui.CashFlowReport import CashFlowReport
 from cash_flow.ui.CashFlowDefinition import CashFlowDefinition
 from cash_flow.ui.Customers import Customers
@@ -48,11 +49,18 @@ class CashFlow(QApplication):
         self.ui.button_CashFlowReport.clicked.connect(self.open_CashFlowReport)
         self.ui.button_CashFlowDefinition.clicked.connect(self.open_CashFlowDefinition)
         self.ui.button_PlannedAnonymousOperations.clicked.connect(self.open_PlannedAnonymousOperations)
+        self.ui.button_Budget.clicked.connect(self.open_Budget)
         self.ui.button_Demo.clicked.connect(self.open_Demo)
 
 
     def setup_translations(self):
         pass
+
+
+    def open_Budget(self):
+        tabs = self.ui.tabWidget
+        i = tabs.addTab(Budget(self.engine), "Budžets")
+        tabs.setCurrentIndex(i)
 
     def open_PlannedAnonymousOperations(self):
         tabs = self.ui.tabWidget
