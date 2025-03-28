@@ -278,39 +278,39 @@ class CashFlowDefinition(Base):
     name = mapped_column(String(100), nullable=True)
 
 @event.listens_for(CashFlowDefinition.metadata, "after_create")
-def default_data_doc_types(target, connection, **kw):
+def default_data_cf_definition(target, connection, **kw):
     table_name = CashFlowDefinition.__tablename__
-    sql = "INSERT INTO " + table_name + " (key, definition_type, name) VALUES (:key, :type, :name)"
-    params = [{"key": "100", "type": None, "name": "Pamatdarbības naudas plūsma"},
-              {"key": "101", "type": 1, "name": "Ieņēmumi no preču un pakalpojumu pārdošanas"},
-              {"key": "102", "type": 1, "name": "Maksājumi piegādātājiem"},
-              {"key": "103", "type": 1, "name": "Maksājumi darbiniekiem"},
-              {"key": "104", "type": 1, "name": "Pārējie pamatdarbības ieņēmumi un izdevumi"},
-              {"key": "199", "type": 2, "name": "Bruto pamatdarbības naudas plūsma"},
-              {"key": "201", "type": 1, "name": "Izdevumi procentu maksājumiem"},
-              {"key": "202", "type": 1, "name": "Izdevumi nodokļu maksājumiem"},
-              {"key": "203", "type": 1, "name": "Naudas plūsma no ārkārtas posteņiem"},
-              {"key": "299", "type": 2, "name": "Pamatdarbības neto naudas plūsma"},
-              {"key": "300", "type": None, "name": "Ieguldīšanas darbības naudas plūsma"},
-              {"key": "301", "type": 1, "name": "Radniecīgo vai asociēto uzņēmumu daļu iegāde"},
-              {"key": "302", "type": 1, "name": "Ieņēmumi no radniecīgo vai asociēto uzņēmumu daļu pārdošanas"},
-              {"key": "303", "type": 1, "name": "Pamatlīdzekļu un nemateriālo ieguldījumu iegāde"},
-              {"key": "304", "type": 1, "name": "Ieņēmumi no pamatlīdzekļu un nemateriālo ieguldījumu pārdošanas"},
-              {"key": "305", "type": 1, "name": "Izsniegtie aizdevumi"},
-              {"key": "306", "type": 1, "name": "Ieņēmumi no aizdevumu atmaksas"},
-              {"key": "307", "type": 1, "name": "Saņemtie procenti"},
-              {"key": "308", "type": 1, "name": "Saņemtās dividendes"},
-              {"key": "309", "type": 2, "name": "Ieguldījumu darbības neto naudas plūsma"},
-              {"key": "400", "type": None, "name": "Finansēšanas darbības naudas plūsma"},
-              {"key": "401", "type": 1, "name": "Ieņēmumi no akciju vai obligāciju emisijas"},
-              {"key": "402", "type": 1, "name": "Saņemtie aizņēmumi"},
-              {"key": "403", "type": 1, "name": "Izdevumi aizdevumu atmaksai"},
-              {"key": "404", "type": 1, "name": "Samaksātie procenti"},
-              {"key": "405", "type": 1, "name": "Izmaksātās dividendes"},
-              {"key": "499", "type": 2, "name": "Finansēšanas darbības neto naudas plūsma"},
-              {"key": "901", "type": 1, "name": "Ārvalstu valūtu kursu svārstību rezultāts"},
-              {"key": "902", "type": 2, "name": "Neto naudas plūsma"},
-              {"key": "999", "type": 3, "name": "Naudas līdzekļu atlikums pārskata perioda beigās"}
+    sql = "INSERT INTO " + table_name + " (id, key, definition_type, name) VALUES (:id, :key, :type, :name)"
+    params = [{"id": 1, "key": "100", "type": None, "name": "PAMATDARBĪBAS NAUDAS PLŪSMA"},
+              {"id": 2, "key": "101", "type": 1, "name": "Ieņēmumi no preču un pakalpojumu pārdošanas"},
+              {"id": 3, "key": "102", "type": 1, "name": "Maksājumi piegādātājiem"},
+              {"id": 4, "key": "103", "type": 1, "name": "Maksājumi darbiniekiem"},
+              {"id": 5, "key": "104", "type": 1, "name": "Pārējie pamatdarbības ieņēmumi un izdevumi"},
+              {"id": 6, "key": "199", "type": 2, "name": "BRUTO PAMATDARBĪBAS NAUDAS PLŪSMA"},
+              {"id": 7, "key": "201", "type": 1, "name": "Izdevumi procentu maksājumiem"},
+              {"id": 8, "key": "202", "type": 1, "name": "Izdevumi nodokļu maksājumiem"},
+              {"id": 9, "key": "203", "type": 1, "name": "Naudas plūsma no ārkārtas posteņiem"},
+              {"id": 10, "key": "299", "type": 2, "name": "PAMATDARBĪBAS NETO NAUDAS PLŪSMA"},
+              {"id": 11, "key": "300", "type": None, "name": "IEGULDĪŠANAS DARBĪBAS NAUDAS PLŪSMA"},
+              {"id": 12, "key": "301", "type": 1, "name": "Radniecīgo vai asociēto uzņēmumu daļu iegāde"},
+              {"id": 13, "key": "302", "type": 1, "name": "Ieņēmumi no radniecīgo vai asociēto uzņēmumu daļu pārdošanas"},
+              {"id": 14, "key": "303", "type": 1, "name": "Pamatlīdzekļu un nemateriālo ieguldījumu iegāde"},
+              {"id": 15, "key": "304", "type": 1, "name": "Ieņēmumi no pamatlīdzekļu un nemateriālo ieguldījumu pārdošanas"},
+              {"id": 16, "key": "305", "type": 1, "name": "Izsniegtie aizdevumi"},
+              {"id": 17, "key": "306", "type": 1, "name": "Ieņēmumi no aizdevumu atmaksas"},
+              {"id": 18, "key": "307", "type": 1, "name": "Saņemtie procenti"},
+              {"id": 19, "key": "308", "type": 1, "name": "Saņemtās dividendes"},
+              {"id": 20, "key": "309", "type": 2, "name": "IEGULDĪJUMU DARBĪBAS NETO NAUDAS PLŪSMA"},
+              {"id": 21, "key": "400", "type": None, "name": "FINANSĒŠANAS DARBĪBAS NAUDAS PLŪSMA"},
+              {"id": 22, "key": "401", "type": 1, "name": "Ieņēmumi no akciju vai obligāciju emisijas"},
+              {"id": 23, "key": "402", "type": 1, "name": "Saņemtie aizņēmumi"},
+              {"id": 24, "key": "403", "type": 1, "name": "Izdevumi aizdevumu atmaksai"},
+              {"id": 25, "key": "404", "type": 1, "name": "Samaksātie procenti"},
+              {"id": 26, "key": "405", "type": 1, "name": "Izmaksātās dividendes"},
+              {"id": 27, "key": "499", "type": 2, "name": "FINANSĒŠANAS DARBĪBAS NETO NAUDAS PLŪSMA"},
+              {"id": 28, "key": "901", "type": 1, "name": "Ārvalstu valūtu kursu svārstību rezultāts"},
+              {"id": 29, "key": "902", "type": 2, "name": "NETO NAUDAS PLŪSMA"},
+              {"id": 30, "key": "999", "type": 3, "name": "NAUDAS LĪDZEKĻU ATLIKUMS PĀRSKATA PERIODA BEIGĀS"}
               ]
 
     connection.execute(text(sql), params)
@@ -329,6 +329,66 @@ class CashFlowDefinitionTotal(Base):
     definition_id = mapped_column(ForeignKey("E01_CashFlowDefinition.id"), nullable=True)
     operator = mapped_column(String(1), nullable=True)
     definition_summarized = mapped_column(ForeignKey("E01_CashFlowDefinition.id"), nullable=True)
+
+@event.listens_for(CashFlowDefinitionTotal.metadata, "after_create")
+def default_data_cf_totals(target, connection, **kw):
+    table_name = CashFlowDefinitionTotal.__tablename__
+    sql = "INSERT INTO " + table_name + " (definition_id, operator, definition_summarized) VALUES (:id, :op, :sum)"
+    params = [
+              # BRUTO PAMATDARBĪBAS NAUDAS PLŪSMA
+                  {"id": 6, "op": "+", "sum": 2},
+                  {"id": 6, "op": "+", "sum": 3},
+                  {"id": 6, "op": "+", "sum": 4},
+                  {"id": 6, "op": "+", "sum": 5},
+              # PAMATDARBĪBAS NETO NAUDAS PLŪSMA
+                  {"id": 10, "op": "+", "sum": 2},
+                  {"id": 10, "op": "+", "sum": 3},
+                  {"id": 10, "op": "+", "sum": 4},
+                  {"id": 10, "op": "+", "sum": 5},
+                  {"id": 10, "op": "+", "sum": 7},
+                  {"id": 10, "op": "+", "sum": 8},
+                  {"id": 10, "op": "+", "sum": 9},
+              # IEGULDĪJUMU DARBĪBAS NETO NAUDAS PLŪSMA
+                    {"id": 20, "op": "+", "sum": 12},
+                    {"id": 20, "op": "+", "sum": 13},
+                    {"id": 20, "op": "+", "sum": 14},
+                    {"id": 20, "op": "+", "sum": 15},
+                    {"id": 20, "op": "+", "sum": 16},
+                    {"id": 20, "op": "+", "sum": 17},
+                    {"id": 20, "op": "+", "sum": 18},
+                    {"id": 20, "op": "+", "sum": 19},
+              # FINANSĒŠANAS DARBĪBAS NETO NAUDAS PLŪSMA
+                {"id": 27, "op": "+", "sum": 22},
+                {"id": 27, "op": "+", "sum": 23},
+                {"id": 27, "op": "+", "sum": 24},
+                {"id": 27, "op": "+", "sum": 25},
+                {"id": 27, "op": "+", "sum": 26},
+              # NETO NAUDAS PLŪSMA
+                {"id": 29, "op": "+", "sum": 2},
+                {"id": 29, "op": "+", "sum": 3},
+                {"id": 29, "op": "+", "sum": 4},
+                {"id": 29, "op": "+", "sum": 5},
+                {"id": 29, "op": "+", "sum": 7},
+                {"id": 29, "op": "+", "sum": 8},
+                {"id": 29, "op": "+", "sum": 9},
+                {"id": 29, "op": "+", "sum": 12},
+                {"id": 29, "op": "+", "sum": 13},
+                {"id": 29, "op": "+", "sum": 14},
+                {"id": 29, "op": "+", "sum": 15},
+                {"id": 29, "op": "+", "sum": 16},
+                {"id": 29, "op": "+", "sum": 17},
+                {"id": 29, "op": "+", "sum": 18},
+                {"id": 29, "op": "+", "sum": 19},
+                {"id": 29, "op": "+", "sum": 22},
+                {"id": 29, "op": "+", "sum": 23},
+                {"id": 29, "op": "+", "sum": 24},
+                {"id": 29, "op": "+", "sum": 25},
+                {"id": 29, "op": "+", "sum": 26},
+                {"id": 29, "op": "+", "sum": 28}
+    ]
+
+    connection.execute(text(sql), params)
+
 
 class BudgetEntry(Base):
     __tablename__ = "F01_BudgetEntries"

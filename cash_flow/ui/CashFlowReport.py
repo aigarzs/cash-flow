@@ -197,7 +197,7 @@ class CashFlowReportModel(ATableModel):
             ))
             # .reset_index()
         )
-
+        summarized_totals_df.fillna(0, inplace=True)
         # ********************** (3) Start working with balances on end of each period *******************************
 
         # Convert d_date to_datetime if not yet
