@@ -132,9 +132,9 @@ class CashFlowReportModel(ATableModel):
         # Load all data from database
 
         bank_df = pd.read_sql_query(
-            'SELECT * FROM D13_CF_Bank_Union WHERE d_date >= "' + date_from + '" AND d_date <= "' + date_through + '" ',
+            'SELECT * FROM G09_CashFlow WHERE d_date >= "' + date_from + '" AND d_date <= "' + date_through + '" ',
             self.engine)
-        cash_df = pd.read_sql_query('SELECT * FROM D10_Cash_Transactions WHERE d_date <= "' + date_through + '" ',
+        cash_df = pd.read_sql_query('SELECT * FROM G02_CashTransactions WHERE d_date <= "' + date_through + '" ',
                                     self.engine)
         definition_df = pd.read_sql_table("E01_CashFlowDefinition", self.engine)
         definition_df.rename(columns={"id": "definition_id"}, inplace=True)

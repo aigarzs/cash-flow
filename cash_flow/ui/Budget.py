@@ -100,6 +100,7 @@ class BudgetView(QWidget):
 
     def edit_budget(self):
         self.main_view.refresh_view(1)
+        self.main_view.details_view.clear_commandsbox()
         self.main_view.details_view.requery()
 
     def row_changed(self, index_current, index_previous):
@@ -253,6 +254,11 @@ class DetailsView(QWidget):
     def action_delete(self):
         row = self.table.selectedIndexes()[0].row()
         self.table.model().delete(row)
+
+    def clear_commandsbox(self):
+        self.text_memo.setText("")
+        self.text_amount.setText("")
+        self.filter_Frequency.setCurrentText("Mēnesis")
 
     def return_to_budget(self):
         self.main_view.budget_view.requery()
