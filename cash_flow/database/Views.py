@@ -4,428 +4,242 @@ from cash_flow.database.AEngine import engine
 
 
 def views_all(connection):
-    view_bank_receipts_reconciled(connection)
-    view_bank_receipts(connection)
-    view_bank_receipts_union(connection)
-    view_bank_receipts_agg(connection)
-    view_bank_payments_reconciled(connection)
-    view_bank_payments(connection)
-    view_bank_payments_union(connection)
-    view_bank_payments_agg(connection)
-    view_bank_union(connection)
+    view_general_ledger(connection)
     view_cash_transactions(connection)
-    view_bank_payments_planned(connection)
-    view_bank_receipts_planned(connection)
+    view_cash_generalledger(connection)
+    view_cash_corresponding(connection)
+    view_cash_reconciliations(connection)
+    view_cash_reconciled(connection)
+    view_cash_union(connection)
+    view_cash_aggregated(connection)
+    view_cashflow(connection)
 
 
-
-
-
-def view_bank_receipts_reconciled(connection):
-    drop = "DROP VIEW IF EXISTS D11_CF_BankReceipts_Reconciled"
-    create = """CREATE VIEW D11_CF_BankReceipts_Reconciled AS
-                        SELECT 
-                            gl.id AS id,
+def view_general_ledger(connection):
+    drop = "DROP VIEW IF EXISTS G01_GeneralLedger"
+    create = """CREATE VIEW G01_GeneralLedger AS
+    SELECT 
+                            min(gl.id) AS id,
                             d.id AS d_id, 
-                            d.type_id AS d_type, 
-                            d.date AS d_date, 
-                            d.number AS d_number, 
-                            d.customer_id AS d_customer, 
-                            d.description AS d_description, 
-                            d.amount AS d_amount, 
+                            d.date AS d_date,
                             d.currency AS d_currency,
-                            d.amount_LC AS d_amount_LC,
-                            IIF(d.currency = r.currency, r.amount / d.amount, NULL) AS d_Rate, 
-                            r.id AS r_id,
-                            r.amount AS r_Amount,
-                            r.currency AS r_Currency,
-                            c.id AS c_id,
-                            c.type_id AS c_type,
-                            c.date AS c_date,
-                            c.number AS c_number,
-                            c.customer_id AS c_customer,
-                            c.description AS c_description,
-                            c.amount AS c_amount,
-                            c.currency AS c_currency,
-                            c.amount_LC AS c_amount_LC,
-                            IIF(c.currency = r.currency, r.amount / c.amount, NULL) AS c_Rate,
-                            gl.id AS gl_id,
-                            gl.entry_type AS gl_entry_type,
+                            IIF(SUM(IIF(gl.entry_type == "DR", 1, -1) * gl.amount)> 0, "DR", "CR") AS gl_entry_type,
                             gl.account AS gl_account,
-                            gl.amount AS gl_amount,
-                            gl.amount_LC AS gl_amount_LC,
-                            gl.amount * r.amount / c.amount AS gl_amount_projected,
-                            gl.amount_LC * r.amount / c.amount AS gl_amount_LC_projected
-                            
-                        FROM D01_Documents AS d
-                        LEFT JOIN D04_Reconciliations AS r ON r.payment_id = d.id
-                        LEFT JOIN D01_Documents AS c ON r.invoice_id = c.id
-                        LEFT JOIN D03_GeneralLedger AS gl ON gl.document_id = c_id  
-
-                        WHERE d.type_id = 1 AND r.id IS NOT NULL
-                        
-                        """
-
-
-    connection.execute(text(drop))
-    connection.execute(text(create))
-
-
-def view_bank_payments_reconciled(connection):
-    drop = "DROP VIEW IF EXISTS D11_CF_BankPayments_Reconciled"
-    create = """CREATE VIEW D11_CF_BankPayments_Reconciled AS
-                        SELECT d.id AS d_id, 
-                            d.type_id AS d_type, 
-                            d.date AS d_date, 
-                            d.number AS d_number, 
-                            d.vendor_id AS d_vendor, 
-                            d.description AS d_description, 
-                            d.amount AS d_amount, 
-                            d.currency AS d_currency,
-                            d.amount_LC AS d_amount_LC,
-                            IIF(d.currency = r.currency, r.amount / d.amount, NULL) AS d_Rate, 
-                            r.id AS r_id,
-                            r.amount AS r_Amount,
-                            r.currency AS r_Currency,
-                            c.id AS c_id,
-                            c.type_id AS c_type,
-                            c.date AS c_date,
-                            c.number AS c_number,
-                            c.vendor_id AS c_vendor,
-                            c.description AS c_description,
-                            c.amount AS c_amount,
-                            c.currency AS c_currency,
-                            c.amount_LC AS c_amount_LC,
-                            IIF(c.currency = r.currency, r.amount / c.amount, NULL) AS c_Rate,
-                            gl.id AS gl_id,
-                            gl.entry_type AS gl_entry_type,
-                            gl.account AS gl_account,
-                            gl.amount AS gl_amount,
-                            gl.amount_LC AS gl_amount_LC,
-                            gl.amount * r.amount / c.amount AS gl_amount_projected,
-                            gl.amount_LC * r.amount / c.amount AS gl_amount_LC_projected
-
-                        FROM D01_Documents AS d
-                        LEFT JOIN D04_Reconciliations AS r ON r.payment_id = d.id
-                        LEFT JOIN D01_Documents AS c ON r.invoice_id = c.id
-                        LEFT JOIN D03_GeneralLedger AS gl ON gl.document_id = c_id  
-
-                        WHERE d.type_id = 2 AND r.id IS NOT NULL
-
-                        """
-
-    connection.execute(text(drop))
-    connection.execute(text(create))
-
-
-def view_bank_receipts(connection):
-    drop = "DROP VIEW IF EXISTS D11_CF_BankReceipts"
-    create = """CREATE VIEW D11_CF_BankReceipts AS
-                        SELECT d.id AS d_id, 
-                            d.type_id AS d_type, 
-                            d.date AS d_date, 
-                            d.number AS d_number, 
-                            d.customer_id AS d_customer, 
-                            d.description AS d_description, 
-                            d.amount AS d_amount, 
-                            d.currency AS d_currency,
-                            d.amount_LC AS d_amount_LC,
-                            gl.id AS gl_id,
-                            gl.entry_type AS gl_entry_type,
-                            gl.account AS gl_account,
-                            gl.amount AS gl_amount,
-                            gl.amount_LC AS gl_amount_LC
-                            
-
-                        FROM D01_Documents AS d
-                        LEFT JOIN D03_GeneralLedger AS gl ON gl.document_id = d.id  
-
-                        WHERE d.type_id = 1 
-
-                        """
-
-    connection.execute(text(drop))
-    connection.execute(text(create))
-
-
-def view_bank_payments(connection):
-    drop = "DROP VIEW IF EXISTS D11_CF_BankPayments"
-    create = """CREATE VIEW D11_CF_BankPayments AS
-                        SELECT d.id AS d_id, 
-                            d.type_id AS d_type, 
-                            d.date AS d_date, 
-                            d.number AS d_number, 
-                            d.vendor_id AS d_vendor, 
-                            d.description AS d_description, 
-                            d.amount AS d_amount, 
-                            d.currency AS d_currency,
-                            d.amount_LC AS d_amount_LC,
-                            gl.id AS gl_id,
-                            gl.entry_type AS gl_entry_type,
-                            gl.account AS gl_account,
-                            gl.amount AS gl_amount,
-                            gl.amount_LC AS gl_amount_LC
-
-
-                        FROM D01_Documents AS d
-                        LEFT JOIN D03_GeneralLedger AS gl ON gl.document_id = d.id  
-
-                        WHERE d.type_id = 2 
-
-                        """
-
-    connection.execute(text(drop))
-    connection.execute(text(create))
-
-
-def view_bank_receipts_union(connection):
-    drop = "DROP VIEW IF EXISTS D11_CF_BankReceipts_Union"
-    create = """CREATE VIEW D11_CF_BankReceipts_Union AS
-                        SELECT 
-                            d_id, 
-                            d_type, 
-                            d_date, 
-                            d_number, 
-                            d_customer, 
-                            gl_id,
-                            gl_entry_type,
-                            gl_account,
-                            gl_amount,
-                            d_currency,
-                            gl_amount_LC
-                        FROM D11_CF_BankReceipts
-                        UNION ALL
-                        SELECT
-                            d_id, 
-                            d_type, 
-                            d_date, 
-                            d_number, 
-                            d_customer, 
-                            gl_id,
-                            gl_entry_type,
-                            gl_account,
-                            gl_amount_projected,
-                            c_currency,
-                            gl_amount_LC_projected
-                        FROM D11_CF_BankReceipts_Reconciled
-                        """
-
-    connection.execute(text(drop))
-    connection.execute(text(create))
-
-def view_bank_payments_union(connection):
-    drop = "DROP VIEW IF EXISTS D11_CF_BankPayments_Union"
-    create = """CREATE VIEW D11_CF_BankPayments_Union AS
-                        SELECT 
-                            d_id, 
-                            d_type, 
-                            d_date, 
-                            d_number, 
-                            d_vendor, 
-                            gl_id,
-                            gl_entry_type,
-                            gl_account,
-                            gl_amount,
-                            d_currency,
-                            gl_amount_LC
-                        FROM D11_CF_BankPayments
-                        UNION ALL
-                        SELECT
-                            d_id, 
-                            d_type, 
-                            d_date, 
-                            d_number, 
-                            d_vendor, 
-                            gl_id,
-                            gl_entry_type,
-                            gl_account,
-                            gl_amount_projected,
-                            c_currency,
-                            gl_amount_LC_projected
-                        FROM D11_CF_BankPayments_Reconciled
-                        """
-
-    connection.execute(text(drop))
-    connection.execute(text(create))
-
-def view_bank_receipts_agg(connection):
-    drop = "DROP VIEW IF EXISTS D12_CF_BankReceipts_Aggregated"
-    create = """CREATE VIEW D12_CF_BankReceipts_Aggregated AS
-                        SELECT 
-                            d_id, 
-                            d_type, 
-                            d_date, 
-                            d_customer, 
-                            gl_account,
-                            IIF(ROUND(SUM(IIF(gl_entry_type=='DR', 1, -1) * gl_amount),2) < 0, 'CR', 'DR') AS gl_entry_type,
-                            ROUND(ABS(SUM(IIF(gl_entry_type=='DR', 1, -1) * gl_amount)),2) AS gl_amount,
-                            d_currency,
-                            ROUND(ABS(SUM(IIF(gl_entry_type=='DR', 1, -1) * gl_amount_LC)),2) AS gl_amount_LC
-                        FROM D11_CF_BankReceipts_Union
-                        GROUP BY d_id, d_type, d_date, d_customer, gl_account, d_currency
-                        ORDER BY d_date, d_id
-                        """
-
-    connection.execute(text(drop))
-    connection.execute(text(create))
-
-def view_bank_payments_agg(connection):
-    drop = "DROP VIEW IF EXISTS D12_CF_BankPayments_Aggregated"
-    create = """CREATE VIEW D12_CF_BankPayments_Aggregated AS
-                        SELECT 
-                            d_id, 
-                            d_type, 
-                            d_date, 
-                            d_vendor, 
-                            gl_account,
-                            IIF(ROUND(SUM(IIF(gl_entry_type=='DR', 1, -1) * gl_amount),2) < 0, 'CR', 'DR') AS gl_entry_type,
-                            ROUND(ABS(SUM(IIF(gl_entry_type=='DR', 1, -1) * gl_amount)),2) AS gl_amount,
-                            d_currency,
-                            ROUND(ABS(SUM(IIF(gl_entry_type=='DR', 1, -1) * gl_amount_LC)),2) AS gl_amount_LC
-                        FROM D11_CF_BankPayments_Union
-                        GROUP BY d_id, d_type, d_date, d_vendor, gl_account, d_currency
-                        ORDER BY d_date, d_id
-                        """
-
-    connection.execute(text(drop))
-    connection.execute(text(create))
-
-
-def view_bank_union(connection):
-    drop = "DROP VIEW IF EXISTS D13_CF_Bank_Union"
-    create = """CREATE VIEW D13_CF_Bank_Union AS 
-                    SELECT 
-                        d_id,
-                        d_type,
-                        d_date,
-                        NULL AS d_customer,
-                        d_vendor,
-                        gl_account,
-                        gl_entry_type,
-                        gl_amount,
-                        d_currency,
-                        gl_amount_LC
-                    FROM D12_CF_BankPayments_Aggregated
-                    UNION SELECT
-                        d_id,
-                        d_type,
-                        d_date,
-                        d_customer,
-                        NULL AS d_vendor,
-                        gl_account,
-                        gl_entry_type,
-                        gl_amount,
-                        d_currency,
-                        gl_amount_LC
-                    FROM D12_CF_BankReceipts_Aggregated """
+                            ABS(SUM(IIF(gl.entry_type == "DR", 1, -1) * gl.amount)) AS gl_amount,
+                            ABS(SUM(IIF(gl.entry_type == "DR", 1, -1) * gl.amount_LC)) AS gl_amount_LC
+                                                        
+                        FROM D03_GeneralLedger AS gl 
+                        LEFT JOIN D01_Documents AS d ON gl.document_id = d.id
+                        GROUP BY d.id, d.currency, gl.account    
+    """
 
     connection.execute(text(drop))
     connection.execute(text(create))
 
 def view_cash_transactions(connection):
-    drop = "DROP VIEW IF EXISTS D10_Cash_Transactions"
-    create = """CREATE VIEW D10_Cash_Transactions AS
-    SELECT 
-                            gl.id AS id,
-                            d.id AS d_id, 
-                            d.type_id AS d_type, 
-                            d.number AS d_number,
-                            d.date AS d_date, 
-                            d.vendor_id AS d_vendor,
-                            d.customer_id AS d_customer,
-                            d.description AS d_description,
-                            d.currency AS d_currency,
-                            gl.entry_type AS gl_entry_type,
-                            gl.account AS gl_account,
-                            gl.amount AS gl_amount,
-                            gl.amount_LC AS gl_amount_LC
+    drop = "DROP VIEW IF EXISTS G02_CashTransactions"
+    create = """CREATE VIEW G02_CashTransactions AS
+        SELECT 
+                                gl.id AS id,
+                            gl.d_id AS d_id, 
+                            d.date AS d_date,
+                            IIF(gl.gl_entry_type = "DR", "Receipt", "Payment") AS cash_type,
+                            gl.d_currency AS d_currency,
+                            gl.gl_entry_type AS gl_entry_type,
+                            gl.gl_account AS gl_account,
+                            gl.gl_amount  AS gl_amount,
+                            gl.gl_amount_LC AS gl_amount_LC
                                                         
                         FROM B03_AccountTypes AS t
                         LEFT JOIN B02_Accounts AS a ON t.id = a.type_id
-                        LEFT JOIN D03_GeneralLedger AS gl ON a.code = gl.account
-                        LEFT JOIN D01_Documents AS d ON gl.document_id = d.id
+                        LEFT JOIN G01_GeneralLedger AS gl ON a.code = gl.gl_account
+                        LEFT JOIN D01_Documents AS d ON gl.d_id = d.id                        
                         WHERE t.id = 1 AND gl.id IS NOT NULL
-                        ORDER BY d.date, d.id
-                                                
-                    """
+                        ORDER BY d.date, gl.d_id
+        """
 
     connection.execute(text(drop))
     connection.execute(text(create))
 
+def view_cash_generalledger(connection):
+    drop = "DROP VIEW IF EXISTS G03_Cash_GeneralLedger"
+    create = """CREATE VIEW G03_Cash_GeneralLedger AS
+            SELECT 
+                            gl.id AS id,
+                            gl.d_id AS d_id,
+                            cash.cash_type AS cash_type,
+                            doc.type_id AS d_type,
+                            doc.date AS d_date,
+                            doc.number AS d_number,
+                            doc.customer_id AS d_customer_id,
+                            doc.vendor_id AS d_vendor_id,
+                            doc.description AS d_description, 
+                            gl.d_currency AS d_currency,
+                            gl.gl_entry_type AS gl_entry_type,
+                            gl.gl_account AS gl_account,
+                            gl.gl_amount AS gl_amount,
+                            gl.gl_amount_LC AS gl_amount_LC
+                             
+            FROM G02_CashTransactions AS cash 
+            LEFT JOIN G01_GeneralLedger AS gl
+            ON cash.d_id = gl.d_id
+            LEFT JOIN D01_Documents AS doc
+            ON gl.d_id = doc.id
+            """
 
-def view_bank_payments_planned(connection):
-    drop = "DROP VIEW IF EXISTS D14_CF_BankPayments_Planned"
-    create = """CREATE VIEW D14_CF_BankPayments_Planned AS
-                        SELECT 
-                            d.id AS d_id, 
-                            d.type_id AS d_type, 
-                            d.number AS d_number,
-                            d.date AS d_date, 
-                            d.date_due AS d_date_due,
-                            IIF(d.date_planned_clearing < DATE(), DATE(), d.date_planned_clearing) AS d_date_planned,
-                            d.priority AS d_priority,
-                            d.vendor_id AS d_vendor, 
-                            d.description AS d_description,
-                            (d.amount - d.cleared_amount) / d.amount AS c_Rate,
-                            d.amount AS d_amount,
-                            d.currency AS d_currency,
-                            d.amount_LC AS d_amount_LC,
-                            ROUND(d.amount - d.cleared_amount,2) AS d_remaining_amount,
-                            ROUND(d.amount_LC * (d.amount - d.cleared_amount) / d.amount,2) AS d_remaining_amount_LC,
-                            gl.entry_type AS gl_entry_type,
-                            gl.account AS gl_account,
-                            gl.amount AS gl_amount,
-                            gl.amount_LC AS gl_amount_LC,
-                            ROUND(gl.amount * (d.amount - d.cleared_amount) / d.amount,2) AS gl_amount_projected,
-                            ROUND(gl.amount_LC * (d.amount - d.cleared_amount) / d.amount,2) AS gl_amount_LC_projected
+    connection.execute(text(drop))
+    connection.execute(text(create))
+
+def view_cash_corresponding(connection):
+    drop = "DROP VIEW IF EXISTS G04_CashTransactions_Corresponding"
+    create = """CREATE VIEW G04_CashTransactions_Corresponding AS
+            SELECT 
+                    gl.id AS id,
+                    cash.d_id AS d_id, 
+                    cash.d_currency AS d_currency,
+                    cash.cash_type AS cash_type,
+                    gl.gl_entry_type AS gl_entry_type,
+                    gl.gl_account AS gl_account,
+                    a.type_id AS gl_account_type,
+                    gl.gl_amount AS gl_amount,
+                    gl.gl_amount_LC AS gl_amount_LC 
+                FROM G02_CashTransactions AS cash 
+                LEFT JOIN G01_GeneralLedger AS gl 
+                ON cash.d_id = gl.d_id AND cash.id <> gl.id
+                LEFT JOIN B02_Accounts AS a ON gl.gl_account = a.code
+            """
+
+    connection.execute(text(drop))
+    connection.execute(text(create))
+
+def view_cash_reconciliations(connection):
+    drop = "DROP VIEW IF EXISTS G05_CashTransactions_Reconciliations"
+    create = """CREATE VIEW G05_CashTransactions_Reconciliations AS
+            SELECT 
+                    cash.id AS cash_id,
+                    cash.d_id AS cash_d_id, 
+                    cash.d_currency AS cash_currency,
+                    cash.cash_type AS cash_type,
+                    cash.gl_entry_type AS cash_gl_entry_type,
+                    cash.gl_account AS gl_account,
+                    cash.gl_account_type AS gl_account_type,
+                    cash.gl_amount AS cash_gl_amount,
+                    cash.gl_amount_LC AS cash_gl_amount_LC,
+                    r.id AS r_id,
+                    r.amount AS r_amount,
+                    r.invoice_id AS invoice_d_id,
+                    invoice.gl_entry_type AS invoice_gl_entry_type,
+                    invoice.gl_amount AS invoice_gl_amount,
+                    invoice.gl_amount_LC AS invoice_gl_amount_LC,
+                    IIF(invoice.gl_amount <> 0, r.amount / invoice.gl_amount, 0) AS r_rate
+                
+                FROM G04_CashTransactions_Corresponding AS cash
+                LEFT JOIN D04_Reconciliations AS r
+                ON cash.gl_account_type IN (2,3) AND cash.d_id = r.payment_id AND cash.d_currency = r.currency
+                LEFT JOIN G01_GeneralLedger AS invoice ON invoice.d_id = r.invoice_id AND cash.gl_account = invoice.gl_account AND cash.d_currency = invoice.d_currency AND cash.gl_entry_type <> invoice.gl_entry_type
+                WHERE r.id IS NOT NULL
+            """
+
+    connection.execute(text(drop))
+    connection.execute(text(create))
+
+def view_cash_reconciled(connection):
+    drop = "DROP VIEW IF EXISTS G06_CashTransactions_Reconciled"
+    create = """CREATE VIEW G06_CashTransactions_Reconciled AS
+            SELECT
+                    r.cash_id AS cash_id,
+                    r.cash_d_id AS cash_d_id,
+                    r.cash_gl_entry_type AS cash_gl_entry_type,
+                    r.gl_account AS cash_gl_account,
+                    r.cash_gl_amount AS cash_gl_amount,
+                    r.cash_gl_amount_LC AS cash_gl_amount_LC,
+                    invoice.id AS invoice_id,
+                    invoice.d_id AS invoice_d_id,
+                    invoice.d_currency AS d_currency,
+                    invoice.gl_entry_type AS invoice_gl_entry_type,
+                    invoice.gl_account AS invoice_gl_account,
+                    r.r_rate * invoice.gl_amount AS invoice_projected_amount,
+                    r.r_rate * invoice.gl_amount_LC AS invoice_projected_amount_LC
+                    
+                    
+            FROM G05_CashTransactions_Reconciliations AS r
+            LEFT JOIN G01_GeneralLedger AS invoice ON r.invoice_d_id = invoice.d_id
+            """
+
+    connection.execute(text(drop))
+    connection.execute(text(create))
+
+def view_cash_union(connection):
+    drop = "DROP VIEW IF EXISTS G07_CashTransactions_Union"
+    create = """CREATE VIEW G07_CashTransactions_Union AS
+                SELECT
+                            cash.id AS id,
+                            cash.d_id AS d_id,
+                            cash.d_currency AS d_currency,
+                            cash.gl_entry_type AS gl_entry_type,
+                            cash.gl_account AS gl_account,
+                            cash.gl_amount AS gl_amount,
+                            cash.gl_amount_LC AS gl_amount_LC
+                FROM G03_Cash_GeneralLedger as cash
+                UNION ALL
+                SELECT
+                        cor.invoice_id AS id,
+                        cor.cash_d_id AS d_id,
+                        cor.d_currency AS d_currency,
+                        cor.invoice_gl_entry_type AS gl_entry_type,
+                        cor.invoice_gl_account AS gl_account,
+                        cor.invoice_projected_amount AS gl_amount,
+                        cor.invoice_projected_amount_LC AS gl_amount_LC
+                FROM G06_CashTransactions_Reconciled as cor
+                """
+
+    connection.execute(text(drop))
+    connection.execute(text(create))
+
+def view_cash_aggregated(connection):
+    drop = "DROP VIEW IF EXISTS G08_CashTransactions_Aggregated"
+    create = """CREATE VIEW G08_CashTransactions_Aggregated AS
+                SELECT
+                            d_id,
+                            d_currency,
+                            IIF(SUM(IIF(gl_entry_type="DR",1,-1)*gl_amount)>0,"DR","CR") AS gl_entry_type,
+                            gl_account,
+                            ROUND(ABS(SUM(IIF(gl_entry_type="DR",1,-1)*gl_amount)),2) AS gl_amount,
+                            ROUND(ABS(SUM(IIF(gl_entry_type="DR",1,-1)*gl_amount_LC)),2) AS gl_amount_LC
+                FROM G07_CashTransactions_Union
+                GROUP BY d_id, d_currency, gl_account
+                """
+
+    connection.execute(text(drop))
+    connection.execute(text(create))
+
+def view_cashflow(connection):
+    drop = "DROP VIEW IF EXISTS G09_CashFlow"
+    create = """CREATE VIEW G09_CashFlow AS
+                SELECT
+
+                            cash.d_id AS d_id,
+                            doc.type_id AS d_type,
+                            doc.date AS d_date,
+                            doc.number AS d_number,
+                            doc.customer_id AS d_customer_id,
+                            doc.vendor_id AS d_vendor_ir,
+                            doc.description AS d_description,
+                            cash.d_currency AS d_currency,
+                            cash.gl_entry_type AS gl_entry_type,
+                            cash.gl_account AS gl_account,
+                            cash.gl_amount AS gl_amount,
+                            cash.gl_amount_LC AS gl_amount_LC
                             
-                        FROM D01_Documents AS d
-                        LEFT JOIN D03_GeneralLedger AS gl ON d.id = gl.document_id
-                        WHERE d.type_id IN (4, 7) AND d.cleared = FALSE
-                        ORDER BY d.date_planned_clearing, d.date, d.id
-                                                
-                    """
+                FROM G08_CashTransactions_Aggregated AS cash
+                LEFT JOIN D01_Documents AS doc
+                ON cash.d_id = doc.id
+                WHERE cash.gl_amount <> 0
+                ORDER BY doc.date, cash.d_id
+                """
 
     connection.execute(text(drop))
     connection.execute(text(create))
-
-
-def view_bank_receipts_planned(connection):
-    drop = "DROP VIEW IF EXISTS D14_CF_BankReceipts_Planned"
-    create = """CREATE VIEW D14_CF_BankReceipts_Planned AS
-                        SELECT 
-                            d.id AS d_id, 
-                            d.type_id AS d_type, 
-                            d.number AS d_number,
-                            d.date AS d_date, 
-                            d.date_due AS d_date_due,
-                            IIF(d.date_planned_clearing < DATE(), DATE(), d.date_planned_clearing) AS d_date_planned,
-                            d.priority AS d_priority,
-                            d.customer_id AS d_customer, 
-                            d.description AS d_description,
-                            (d.amount - d.cleared_amount) / d.amount AS c_Rate,
-                            d.amount AS d_amount,
-                            d.currency AS d_currency,
-                            d.amount_LC AS d_amount_LC,
-                            ROUND(d.amount - d.cleared_amount,2) AS d_remaining_amount,
-                            ROUND(d.amount_LC * (d.amount - d.cleared_amount) / d.amount,2) AS d_remaining_amount_LC,
-                            gl.entry_type AS gl_entry_type,
-                            gl.account AS gl_account,
-                            gl.amount AS gl_amount,
-                            gl.amount_LC AS gl_amount_LC,
-                            ROUND(gl.amount * (d.amount - d.cleared_amount) / d.amount,2) AS gl_amount_projected,
-                            ROUND(gl.amount_LC * (d.amount - d.cleared_amount) / d.amount,2) AS gl_amount_LC_projected
-
-                        FROM D01_Documents AS d
-                        LEFT JOIN D03_GeneralLedger AS gl ON d.id = gl.document_id
-                        WHERE d.type_id = 3 AND d.cleared = FALSE
-                        ORDER BY d.date_planned_clearing, d.date, d.id
-
-                    """
-
-    connection.execute(text(drop))
-    connection.execute(text(create))
-
 
 
 if __name__ == "__main__":
