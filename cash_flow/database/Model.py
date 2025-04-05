@@ -394,10 +394,11 @@ class BudgetEntry(Base):
     __tablename__ = "F01_BudgetEntries"
     id = mapped_column(Integer, primary_key=True)
     definition_id = mapped_column(ForeignKey("E01_CashFlowDefinition.id"), nullable=False)
+    cash_type = mapped_column(String(10), nullable=True, index=True)
     date = mapped_column(DateTime, nullable=True, index=True)
     amount_LC = mapped_column(Numeric(12, 2, 2), nullable=True)
     memo = mapped_column(String(250), nullable=True)
 
-@event.listens_for(CashFlowDefinitionTotal.metadata, "after_create")
+@event.listens_for(BudgetEntry.metadata, "after_create")
 def create_views(target, connection, **kw):
     views_all(connection)

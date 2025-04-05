@@ -1,15 +1,16 @@
 from datetime import date, datetime
 
+import numpy as np
 import pandas as pd
-from PyQt6.QtCore import Qt, QModelIndex
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QDateEdit, QLineEdit, QLabel, QAbstractItemView, \
-    QPushButton, QSpacerItem, QStackedWidget, QSizePolicy, QComboBox, QTextEdit
+    QPushButton, QStackedWidget, QComboBox, QStyledItemDelegate, QItemDelegate
 from sqlalchemy import select, delete
 from sqlalchemy.orm import Session
 
-from cash_flow.database.Model import Customer, BudgetEntry, CashFlowDefinition
+from cash_flow.database.Model import BudgetEntry
 from cash_flow.ui.AWidgets import ATable, ATableModel
-from cash_flow.util.Converters import str_to_priority, various_to_integer, various_to_decimal, str_to_date, date_format
+from cash_flow.util.Converters import various_to_integer, various_to_decimal, str_to_date, date_format
 
 
 class Budget(QWidget):
@@ -56,14 +57,8 @@ class BudgetView(QWidget):
         filterbox_through.addWidget(label_dateThrough)
         filterbox_through.addWidget(self.filter_dateThrough)
         label_freq = QLabel("Periodiskums")
-        self.freq_map = {
-            "Nedēļa": "W-SUN",
-            "Mēnesis": "M",
-            "Kvartāls": "Q",
-            "Gads": "Y"
-        }
         self.filter_Frequency = QComboBox(self)
-        self.filter_Frequency.addItems(self.freq_map.keys())
+        self.filter_Frequency.addItems(frequency_map.keys())
         self.filter_Frequency.setCurrentText("Mēnesis")
         self.filter_Frequency.currentIndexChanged.connect(self.requery)
         filterbox_freq.addWidget(label_freq)
@@ -93,7 +88,7 @@ class BudgetView(QWidget):
 
     def requery(self):
         selected_freq = self.filter_Frequency.currentText()
-        freq = self.freq_map[selected_freq]
+        freq = frequency_map[selected_freq]
         self.table.model().set_filter({"date from": self.filter_dateFrom.date().startOfDay().toPyDateTime(),
                                        "date through": self.filter_dateThrough.date().endOfDay().toPyDateTime(),
                                        "frequency": freq})
@@ -132,11 +127,16 @@ class BudgetViewModel(ATableModel):
         budget_entries_df["date"] = pd.to_datetime(budget_entries_df['date'])
         budget_entries_df["period"] = budget_entries_df["date"].dt.to_period(report_period).apply(
             lambda r: r.to_timestamp(how='end').normalize() if pd.notna(r) else pd.NaT)
+        budget_entries_df['adjusted_amount_LC'] = np.where(
+            budget_entries_df['cash_type'] == 'Receipt',
+            budget_entries_df['amount_LC'],
+            -budget_entries_df['amount_LC']
+        )
 
         pivot_df = budget_entries_df.pivot_table(
             index='definition_id',
             columns='period',
-            values='amount_LC',
+            values='adjusted_amount_LC',
             aggfunc="sum",
             fill_value=0,
             dropna=False
@@ -191,34 +191,39 @@ class DetailsView(QWidget):
         filterbox.addLayout(filterbox_through)
         label_createAmounts = QLabel("Izveidot atkārtojošos ierakstus")
         label_createAmounts.setStyleSheet("font-weight: bold")
-        commandsbox = QHBoxLayout()
+        commandsbox = QVBoxLayout()
+        commands_controls = QHBoxLayout()
+        commands_buttons = QHBoxLayout()
         label_memo = QLabel("Piezīmes")
         self.text_memo = QLineEdit()
+        label_type = QLabel("Tips")
+        self.filter_type = QComboBox()
+        self.filter_type.addItems(cash_type_map.keys())
+        self.filter_type.setCurrentText("Ieņēmums")
         label_amount = QLabel("Summa BV")
         self.text_amount = QLineEdit()
         self.text_amount.setMaximumWidth(100)
         label_frequency = QLabel("Periodiskums")
-        self.freq_map = {
-            "Nedēļa": "W-SUN",
-            "Mēnesis": "M",
-            "Kvartāls": "Q",
-            "Gads": "Y"
-        }
         self.filter_Frequency = QComboBox(self)
-        self.filter_Frequency.addItems(self.freq_map.keys())
+        self.filter_Frequency.addItems(frequency_map.keys())
         self.filter_Frequency.setCurrentText("Mēnesis")
+        commands_controls.addWidget(label_memo)
+        commands_controls.addWidget(self.text_memo)
+        commands_controls.addWidget(label_type)
+        commands_controls.addWidget(self.filter_type)
+        commands_controls.addWidget(label_amount)
+        commands_controls.addWidget(self.text_amount)
+        commands_controls.addWidget(label_frequency)
+        commands_controls.addWidget(self.filter_Frequency)
         btn_generate = QPushButton("Izveidot")
         btn_generate.clicked.connect(self.generate_amounts)
         btn_delete = QPushButton("Dzēst")
         btn_delete.clicked.connect(self.delete_amounts)
-        commandsbox.addWidget(label_memo)
-        commandsbox.addWidget(self.text_memo)
-        commandsbox.addWidget(label_amount)
-        commandsbox.addWidget(self.text_amount)
-        commandsbox.addWidget(label_frequency)
-        commandsbox.addWidget(self.filter_Frequency)
-        commandsbox.addWidget(btn_generate)
-        commandsbox.addWidget(btn_delete)
+        commands_buttons.addStretch()
+        commands_buttons.addWidget(btn_generate)
+        commands_buttons.addWidget(btn_delete)
+        commandsbox.addLayout(commands_controls)
+        commandsbox.addLayout(commands_buttons)
         toolsbox = QHBoxLayout()
         btn_return = QPushButton("Atgriezties uz budžetu")
         btn_return.clicked.connect(self.return_to_budget)
@@ -232,6 +237,8 @@ class DetailsView(QWidget):
         action_delete = self.table.context_menu.addAction("Dzēst")
         action_delete.triggered.connect(self.action_delete)
         self.table.setModel(DetailsModel(self.table, self.engine))
+        type_delegate = EntryTypeDelegate(self.table)
+        self.table.setItemDelegateForColumn(0, type_delegate)
 
         vbox.addWidget(self.field_name)
         vbox.addWidget(label_filter)
@@ -276,15 +283,17 @@ class DetailsView(QWidget):
     def generate_amounts(self):
         amount = various_to_decimal(self.text_amount.text())
         memo = self.text_memo.text()
+        cash_type = cash_type_map[self.filter_type.currentText()]
         definition_id = self.table.model().definition_id
         if amount and definition_id:
             periods = pd.date_range(start = self.filter_dateFrom.date().toPyDate(),
                                     end = self.filter_dateThrough.date().toPyDate(),
-                                    freq = self.freq_map[self.filter_Frequency.currentText()])
+                                    freq = frequency_map[self.filter_Frequency.currentText()])
 
             with Session(self.engine) as session:
                 for pdate in periods:
-                    entry = BudgetEntry(definition_id=definition_id, date=pdate, amount_LC=amount, memo=memo)
+                    entry = BudgetEntry(definition_id=definition_id, cash_type=cash_type,
+                                        date=pdate, amount_LC=amount, memo=memo)
                     session.add(entry)
                     session.commit()
 
@@ -294,19 +303,45 @@ class DetailsView(QWidget):
         amount = various_to_decimal(self.text_amount.text())
         definition_id = self.table.model().definition_id
         memo = self.text_memo.text()
+        cash_type = cash_type_map[self.filter_type.currentText()]
         if amount and definition_id:
             periods = pd.date_range(start=self.filter_dateFrom.date().toPyDate(),
                                     end=self.filter_dateThrough.date().toPyDate(),
-                                    freq=self.freq_map[self.filter_Frequency.currentText()])
+                                    freq=frequency_map[self.filter_Frequency.currentText()])
 
             with Session(self.engine) as session:
                 for pdate in periods:
                     stmt = delete(BudgetEntry).where(BudgetEntry.definition_id==definition_id,
-                    BudgetEntry.date==pdate, BudgetEntry.amount_LC==amount, BudgetEntry.memo==memo)
+                                                    BudgetEntry.date==pdate, BudgetEntry.cash_type==cash_type,
+                                                    BudgetEntry.amount_LC==amount, BudgetEntry.memo==memo)
                     session.execute(stmt)
                     session.commit()
 
         self.requery()
+
+frequency_map = {
+            "Nedēļa": "W-SUN",
+            "Mēnesis": "M",
+            "Kvartāls": "Q",
+            "Gads": "Y"
+        }
+
+cash_type_map = {
+            "Ieņēmums": "Receipt",
+            "Maksājums": "Payment"
+        }
+
+class EntryTypeDelegate(QStyledItemDelegate):
+    def __init__(self, parent):
+        QItemDelegate.__init__(self, parent)
+
+    def createEditor(self, parent, option, index):
+        combo = QComboBox(parent)
+        combo.addItems(cash_type_map.keys())
+        return combo
+
+    def updateEditorGeometry(self, editor, option, index):
+        editor.setGeometry(option.rect)
 
 
 class DetailsModel(ATableModel):
@@ -318,6 +353,7 @@ class DetailsModel(ATableModel):
         date_through = self.parent().parent().filter_dateThrough.date().endOfDay().toPyDateTime()
         # python_datetime = self.date_edit.date().startOfDay().toPyDateTime()
         stmt = select(BudgetEntry.id,
+                      BudgetEntry.cash_type,
                       BudgetEntry.date,
                       BudgetEntry.amount_LC,
                       BudgetEntry.memo) \
@@ -330,7 +366,7 @@ class DetailsModel(ATableModel):
             dataset = session.execute(stmt).all()
 
             # Convert to DataFrame
-            data = pd.DataFrame(dataset, columns=["id", "Datums", "Summa BV", "Piezīmes"])
+            data = pd.DataFrame(dataset, columns=["id", "Tips", "Datums", "Summa BV", "Piezīmes"])
             data.set_index("id", inplace=True)
             return data
 
@@ -347,6 +383,13 @@ class DetailsModel(ATableModel):
         self.definition_id = various_to_integer(id)
         # print(f"definition_id = {self.definition_id}")
 
+    def _get_value(self, index):
+        if self.get_column_index("Tips") == index.column():
+            rev_map = {v: k  for k, v in cash_type_map.items()}
+            value = super()._get_value(index)
+            return rev_map.get(value)
+        else:
+            return super()._get_value(index)
 
     def _generate_default_row(self):
         """
@@ -359,8 +402,8 @@ class DetailsModel(ATableModel):
             session.commit()
 
             # Convert to DataFrame
-            new_record = pd.DataFrame([[None, None, None]],
-                                      columns=["Datums", "Summa BV", "Piezīmes"], index=[entry.id])
+            new_record = pd.DataFrame([[None, None, None, None]],
+                                      columns=["Tips", "Datums", "Summa BV", "Piezīmes"], index=[entry.id])
 
             return new_record
 
@@ -376,6 +419,8 @@ class DetailsModel(ATableModel):
             return various_to_decimal(value_str)
         elif self.get_column_index("Datums") == index.column():
             return str_to_date(value_str)
+        elif self.get_column_index("Tips") == index.column():
+            return cash_type_map.get(value_str)
         else:
             return str(value_str)
 
@@ -393,7 +438,9 @@ class DetailsModel(ATableModel):
             stmt = select(BudgetEntry).where(BudgetEntry.id == entry_id)
             entry = session.scalars(stmt).first()
 
-            if self.get_column_index("Datums") == index.column():
+            if self.get_column_index("Tips") == index.column():
+                entry.cash_type = value
+            elif self.get_column_index("Datums") == index.column():
                 entry.date = value
             elif self.get_column_index("Summa BV") == index.column():
                 entry.amount_LC = value

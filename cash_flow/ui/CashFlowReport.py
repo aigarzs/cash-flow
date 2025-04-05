@@ -132,7 +132,7 @@ class CashFlowReportModel(ATableModel):
         # Load all data from database
 
         bank_df = pd.read_sql_query(
-            'SELECT * FROM G09_CashFlow WHERE d_date >= "' + date_from + '" AND d_date <= "' + date_through + '" ',
+            'SELECT * FROM G09_CashFlow_Actual WHERE d_date >= "' + date_from + '" AND d_date <= "' + date_through + '" ',
             self.engine)
         cash_df = pd.read_sql_query('SELECT * FROM G02_CashTransactions WHERE d_date <= "' + date_through + '" ',
                                     self.engine)
