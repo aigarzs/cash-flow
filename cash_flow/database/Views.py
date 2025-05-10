@@ -13,6 +13,9 @@ def views_all(connection):
     view_cash_union(connection)
     view_cash_aggregated(connection)
     view_cashflow_actual(connection)
+    view_cashflow_actual_corresponding(connection)
+    view_casflow_pending(connection)
+
 
 
 def view_general_ledger(connection):
@@ -248,13 +251,28 @@ def view_cashflow_actual(connection):
     connection.execute(text(create))
 
 
-def view_planned_customers(connection):
-    drop = "DROP VIEW IF EXISTS G11_PlannedCustomerInvoices"
-    create = """CREATE VIEW G11_PlannedCustomerInvoices AS
+def view_cashflow_actual_corresponding(connection):
+    drop = "DROP VIEW IF EXISTS G10_CashFlow_Actual_Corresponding"
+    create = """CREATE VIEW G10_CashFlow_Actual_Corresponding AS
+                SELECT 
+                        cf.* 
+                FROM G09_CashFlow_Actual AS cf
+                LEFT JOIN B02_Accounts AS a ON cf.gl_account = a.code
+                WHERE a.type_id <> 1
+                ORDER BY cf.d_date, cf.d_id
+                """
+
+    connection.execute(text(drop))
+    connection.execute(text(create))
+
+
+def view_casflow_pending(connection):
+    drop = "DROP VIEW IF EXISTS G11_CashFlow_Pending"
+    create = """CREATE VIEW G11_CashFlow_Pending AS
                 SELECT 
                     doc.id AS d_id,
-                    "Planned" AS cash_status,
-                    "Receipt" AS cash_type,
+                    "Pending" AS cash_status,
+                    IIF(doc.type_id IN (3, 5), "Receipt", "Payment") AS cash_type,
                     doc.type_id AS d_type,
                     IIF(doc.date_planned_clearing<DATE(),DATE(),doc.date_planned_clearing) AS p_date,
                     doc.number AS d_number,
@@ -269,40 +287,27 @@ def view_planned_customers(connection):
                 FROM D01_Documents AS doc
                 LEFT JOIN G01_GeneralLedger AS gl 
                 ON doc.id = gl.d_id
-                WHERE doc.type_id = 3 AND doc.cleared = False
+                WHERE doc.type_id IN (3, 4, 5, 6) AND doc.cleared = False AND doc.void = False
                 ORDER BY doc.date_planned_clearing, doc.id
                 """
 
     connection.execute(text(drop))
     connection.execute(text(create))
 
-def view_planned_vendors(connection):
-    drop = "DROP VIEW IF EXISTS G12_PlannedVendorInvoices"
-    create = """CREATE VIEW G12_PlannedVendorInvoices AS
+def view_casflow_pending_corresponding(connection):
+    drop = "DROP VIEW IF EXISTS G12_CashFlow_Pending_Corresponding"
+    create = """CREATE VIEW G12_CashFlow_Pending_Corresponding AS
                 SELECT 
-                    doc.id AS d_id,
-                    "Planned" AS cash_status,
-                    "Payment" AS cash_type,
-                    doc.type_id AS d_type,
-                    IIF(doc.date_planned_clearing<DATE(),DATE(),doc.date_planned_clearing) AS p_date,
-                    doc.number AS d_number,
-                    doc.customer_id AS d_customer_id,
-                    doc.vendor_id AS d_vendor_id,
-                    doc.description AS d_description,
-                    doc.currency AS d_currency,
-                    gl.gl_entry_type AS gl_entry_type,
-                    gl.gl_account AS gl_account,
-                    ROUND(((doc.amount - doc.cleared_amount) / amount) * gl.gl_amount,2) AS gl_amount,
-                    ROUND(((doc.amount - doc.cleared_amount) / amount) * gl.gl_amount_LC,2) AS gl_amount_LC
-                FROM D01_Documents AS doc
-                LEFT JOIN G01_GeneralLedger AS gl 
-                ON doc.id = gl.d_id
-                WHERE doc.type_id = 4 AND doc.cleared = False
-                ORDER BY doc.date_planned_clearing, doc.id
+                    cf.*
+                FROM G11_CashFlow_Pending AS cf
+                LEFT JOIN B02_Accounts AS a ON cf.gl_account = a.code
+                WHERE a.type_id NOT IN (2,3)
+                ORDER BY cf.p_date, cf.d_id
                 """
 
     connection.execute(text(drop))
     connection.execute(text(create))
+
 
 
 if __name__ == "__main__":

@@ -247,26 +247,6 @@ class Reconciliation(Base):
                               nullable=False)
     source_key = mapped_column(String(30), nullable=False)
 
-class PlannedAnonymousOperation(Base):
-    __tablename__ = "D05_PlannedAnonymousOperations"
-    id = mapped_column(Integer, primary_key=True)
-    name = mapped_column(String(100), nullable=True)
-
-class PlannedAnonymousAccount(Base):
-    __tablename__ = "D06_PlannedAnonymousAccounts"
-    id = mapped_column(Integer, primary_key=True)
-    operation_id = mapped_column(ForeignKey("D05_PlannedAnonymousOperations.id", ondelete="CASCADE"), nullable=False)
-    entry_type = mapped_column(String(2), nullable=True, index=True)
-    account = mapped_column(ForeignKey("B02_Accounts.code"), nullable=True, index=True)
-    fraction = mapped_column(Float, nullable=True)
-
-class PlannedAnonymousAmount(Base):
-    __tablename__ = "D07_PlannedAnonymousAmounts"
-    id = mapped_column(Integer, primary_key=True)
-    operation_id = mapped_column(ForeignKey("D05_PlannedAnonymousOperations.id", ondelete="CASCADE"), nullable=False)
-    date = mapped_column(DateTime, nullable=True, index=True)
-    amount_LC = mapped_column(Numeric(12, 2, 2), nullable=True)
-
 class CashFlowDefinition(Base):
     __tablename__ = "E01_CashFlowDefinition"
     TYPE_ACCOUNTS = 1
@@ -319,72 +299,70 @@ class CashFlowDefinitionAccount(Base):
     __tablename__ = "E01_CashFlowDefinitionAccounts"
     id = mapped_column(Integer, primary_key=True)
     definition_id = mapped_column(ForeignKey("E01_CashFlowDefinition.id"), nullable=True)
-    operator = mapped_column(String(1), nullable=True)
-    entry_type = mapped_column(String(2), nullable=True)
+    cash_type = mapped_column(String(10), nullable=True)
     account = mapped_column(ForeignKey("B02_Accounts.code"), nullable=True)
 
 class CashFlowDefinitionTotal(Base):
     __tablename__ = "E01_CashFlowDefinitionTotals"
     id = mapped_column(Integer, primary_key=True)
     definition_id = mapped_column(ForeignKey("E01_CashFlowDefinition.id"), nullable=True)
-    operator = mapped_column(String(1), nullable=True)
     definition_summarized = mapped_column(ForeignKey("E01_CashFlowDefinition.id"), nullable=True)
 
 @event.listens_for(CashFlowDefinitionTotal.metadata, "after_create")
 def default_data_cf_totals(target, connection, **kw):
     table_name = CashFlowDefinitionTotal.__tablename__
-    sql = "INSERT INTO " + table_name + " (definition_id, operator, definition_summarized) VALUES (:id, :op, :sum)"
+    sql = "INSERT INTO " + table_name + " (definition_id, definition_summarized) VALUES (:id, :sum)"
     params = [
               # BRUTO PAMATDARBĪBAS NAUDAS PLŪSMA
-                  {"id": 6, "op": "+", "sum": 2},
-                  {"id": 6, "op": "+", "sum": 3},
-                  {"id": 6, "op": "+", "sum": 4},
-                  {"id": 6, "op": "+", "sum": 5},
+                  {"id": 6, "sum": 2},
+                  {"id": 6, "sum": 3},
+                  {"id": 6, "sum": 4},
+                  {"id": 6, "sum": 5},
               # PAMATDARBĪBAS NETO NAUDAS PLŪSMA
-                  {"id": 10, "op": "+", "sum": 2},
-                  {"id": 10, "op": "+", "sum": 3},
-                  {"id": 10, "op": "+", "sum": 4},
-                  {"id": 10, "op": "+", "sum": 5},
-                  {"id": 10, "op": "+", "sum": 7},
-                  {"id": 10, "op": "+", "sum": 8},
-                  {"id": 10, "op": "+", "sum": 9},
+                  {"id": 10, "sum": 2},
+                  {"id": 10, "sum": 3},
+                  {"id": 10, "sum": 4},
+                  {"id": 10, "sum": 5},
+                  {"id": 10, "sum": 7},
+                  {"id": 10, "sum": 8},
+                  {"id": 10, "sum": 9},
               # IEGULDĪJUMU DARBĪBAS NETO NAUDAS PLŪSMA
-                    {"id": 20, "op": "+", "sum": 12},
-                    {"id": 20, "op": "+", "sum": 13},
-                    {"id": 20, "op": "+", "sum": 14},
-                    {"id": 20, "op": "+", "sum": 15},
-                    {"id": 20, "op": "+", "sum": 16},
-                    {"id": 20, "op": "+", "sum": 17},
-                    {"id": 20, "op": "+", "sum": 18},
-                    {"id": 20, "op": "+", "sum": 19},
+                    {"id": 20, "sum": 12},
+                    {"id": 20, "sum": 13},
+                    {"id": 20, "sum": 14},
+                    {"id": 20, "sum": 15},
+                    {"id": 20, "sum": 16},
+                    {"id": 20, "sum": 17},
+                    {"id": 20, "sum": 18},
+                    {"id": 20, "sum": 19},
               # FINANSĒŠANAS DARBĪBAS NETO NAUDAS PLŪSMA
-                {"id": 27, "op": "+", "sum": 22},
-                {"id": 27, "op": "+", "sum": 23},
-                {"id": 27, "op": "+", "sum": 24},
-                {"id": 27, "op": "+", "sum": 25},
-                {"id": 27, "op": "+", "sum": 26},
+                {"id": 27, "sum": 22},
+                {"id": 27, "sum": 23},
+                {"id": 27, "sum": 24},
+                {"id": 27, "sum": 25},
+                {"id": 27, "sum": 26},
               # NETO NAUDAS PLŪSMA
-                {"id": 29, "op": "+", "sum": 2},
-                {"id": 29, "op": "+", "sum": 3},
-                {"id": 29, "op": "+", "sum": 4},
-                {"id": 29, "op": "+", "sum": 5},
-                {"id": 29, "op": "+", "sum": 7},
-                {"id": 29, "op": "+", "sum": 8},
-                {"id": 29, "op": "+", "sum": 9},
-                {"id": 29, "op": "+", "sum": 12},
-                {"id": 29, "op": "+", "sum": 13},
-                {"id": 29, "op": "+", "sum": 14},
-                {"id": 29, "op": "+", "sum": 15},
-                {"id": 29, "op": "+", "sum": 16},
-                {"id": 29, "op": "+", "sum": 17},
-                {"id": 29, "op": "+", "sum": 18},
-                {"id": 29, "op": "+", "sum": 19},
-                {"id": 29, "op": "+", "sum": 22},
-                {"id": 29, "op": "+", "sum": 23},
-                {"id": 29, "op": "+", "sum": 24},
-                {"id": 29, "op": "+", "sum": 25},
-                {"id": 29, "op": "+", "sum": 26},
-                {"id": 29, "op": "+", "sum": 28}
+                {"id": 29, "sum": 2},
+                {"id": 29, "sum": 3},
+                {"id": 29, "sum": 4},
+                {"id": 29, "sum": 5},
+                {"id": 29, "sum": 7},
+                {"id": 29, "sum": 8},
+                {"id": 29, "sum": 9},
+                {"id": 29, "sum": 12},
+                {"id": 29, "sum": 13},
+                {"id": 29, "sum": 14},
+                {"id": 29, "sum": 15},
+                {"id": 29, "sum": 16},
+                {"id": 29, "sum": 17},
+                {"id": 29, "sum": 18},
+                {"id": 29, "sum": 19},
+                {"id": 29, "sum": 22},
+                {"id": 29, "sum": 23},
+                {"id": 29, "sum": 24},
+                {"id": 29, "sum": 25},
+                {"id": 29, "sum": 26},
+                {"id": 29, "sum": 28}
     ]
 
     connection.execute(text(sql), params)

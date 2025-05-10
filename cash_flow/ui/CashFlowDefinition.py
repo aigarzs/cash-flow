@@ -95,26 +95,13 @@ class AccountDelegate(QStyledItemDelegate):
     def updateEditorGeometry(self, editor, option, index):
         editor.setGeometry(option.rect)
 
-class OperatorDelegate(QStyledItemDelegate):
+class CashTypeDelegate(QStyledItemDelegate):
     def __init__(self, parent):
         QItemDelegate.__init__(self, parent)
 
     def createEditor(self, parent, option, index):
         combo = QComboBox(parent)
-        combo.addItems(["+", "-"])
-        return combo
-
-    def updateEditorGeometry(self, editor, option, index):
-        editor.setGeometry(option.rect)
-
-
-class EntryTypeDelegate(QStyledItemDelegate):
-    def __init__(self, parent):
-        QItemDelegate.__init__(self, parent)
-
-    def createEditor(self, parent, option, index):
-        combo = QComboBox(parent)
-        combo.addItems(["DR", "CR"])
+        combo.addItems(AccountsModel.TYPE_DICT.values())
         return combo
 
     def updateEditorGeometry(self, editor, option, index):
@@ -135,10 +122,8 @@ class TotalsTable(ATable):
 
         self.setModel(TotalsModel(self, engine))
 
-        self.operator_delegate = OperatorDelegate(self)
         self.structure_delegate = StructureDelegate(engine, self)
-        self.setItemDelegateForColumn(0, self.operator_delegate)
-        self.setItemDelegateForColumn(1, self.structure_delegate)
+        self.setItemDelegateForColumn(0, self.structure_delegate)
 
     def model(self) -> TotalsModel:
         return super().model()
@@ -158,7 +143,6 @@ class TotalsModel(ATableModel):
 
     def _do_requery(self):
         stmt = select(CFTotal.id,
-                      CFTotal.operator,
                       CFDefinition.name) \
             .join(CFDefinition, CFTotal.definition_summarized==CFDefinition.id) \
             .filter(CFTotal.definition_id == self.definition_id)
@@ -167,7 +151,7 @@ class TotalsModel(ATableModel):
             dataset = session.execute(stmt).all()
 
             # Convert to DataFrame
-            data = pd.DataFrame(dataset, columns=["id", "Operators", "Kopsummas"])
+            data = pd.DataFrame(dataset, columns=["id", "Kopsummas"])
             data.set_index("id", inplace=True)
             return data
 
@@ -191,7 +175,7 @@ class TotalsModel(ATableModel):
             session.commit()
 
             # Convert to DataFrame
-            new_record = pd.DataFrame([[None, None]], columns=["Operators", "Kopsummas"], index=[totals.id])
+            new_record = pd.DataFrame([[None]], columns=["Kopsummas"], index=[totals.id])
 
             return new_record
 
@@ -219,9 +203,7 @@ class TotalsModel(ATableModel):
             stmt = select(CFTotal).where(CFTotal.id == totals_id)
             totals = session.scalars(stmt).first()
 
-            if self.get_column_index("Operators") == index.column():
-                totals.operator = value
-            elif self.get_column_index("Kopsummas") == index.column():
+            if self.get_column_index("Kopsummas") == index.column():
                 s = select(CFDefinition).where(CFDefinition.name == value)
                 t = session.scalars(s).first()
                 totals.definition_summarized = t.id
@@ -255,13 +237,11 @@ class AccountsTable(ATable):
         action_delete = self.context_menu.addAction("Dzēst")
         action_delete.triggered.connect(self.action_delete)
 
-        self.operator_delegate = OperatorDelegate(parent)
-        self.entrytype_delegate = EntryTypeDelegate(parent)
+        self.cashtype_delegate = CashTypeDelegate(self)
         self.account_delegate = AccountDelegate(engine, self)
         self.setModel(AccountsModel(self, engine))
-        self.setItemDelegateForColumn(0, self.operator_delegate)
-        self.setItemDelegateForColumn(1, self.entrytype_delegate)
-        self.setItemDelegateForColumn(2, self.account_delegate)
+        self.setItemDelegateForColumn(0, self.cashtype_delegate)
+        self.setItemDelegateForColumn(1, self.account_delegate)
 
     def model(self) -> AccountsModel:
         return super().model()
@@ -277,11 +257,11 @@ class AccountsTable(ATable):
 class AccountsModel(ATableModel):
     definition_id = None
     EMPTY_ROW_AT_BOTTOM = True
+    TYPE_DICT = {"Receipt": "Ieņēmumi", "Payment": "Maksājumi"}
 
     def _do_requery(self):
         stmt = select(CFAccount.id,
-                      CFAccount.operator,
-                      CFAccount.entry_type,
+                      CFAccount.cash_type,
                       CFAccount.account) \
                .order_by(CFAccount.account)
 
@@ -291,7 +271,7 @@ class AccountsModel(ATableModel):
             dataset = session.execute(stmt).all()
 
             # Convert to DataFrame
-            data = pd.DataFrame(dataset, columns=["id", "Operators", "Tips", "V/G konts"])
+            data = pd.DataFrame(dataset, columns=["id", "Tips", "V/G konts"])
             data.set_index("id", inplace=True)
             return data
 
@@ -302,6 +282,15 @@ class AccountsModel(ATableModel):
 
     def flags(self, index):
         return super().flags(index) | Qt.ItemFlag.ItemIsEditable
+
+    def _get_value(self, index):
+        try:
+            value = self.DATA.iloc[index.row(), index.column()]
+            if index.column() == self.get_column_index("Tips"): value = self.TYPE_DICT.get(value)
+        except IndexError as err:
+            value = None
+
+        return value
 
     def _generate_default_row(self):
         """
@@ -314,7 +303,7 @@ class AccountsModel(ATableModel):
             session.commit()
 
             # Convert to DataFrame
-            new_record = pd.DataFrame([[None, None, None]], columns=["Operators", "Tips", "V/G konts"], index=[accounts.id])
+            new_record = pd.DataFrame([[None, None]], columns=["Tips", "V/G konts"], index=[accounts.id])
 
             return new_record
 
@@ -326,7 +315,12 @@ class AccountsModel(ATableModel):
         :param value_str: value in string format
         :return: value of correct datatype
         """
-        return str(value_str)
+        if self.get_column_index("Tips") == index.column():
+            reversed_types = {v: k for k, v in self.TYPE_DICT.items()}
+            value = reversed_types[value_str]
+            return value
+        else:
+            return str(value_str)
 
     def _set_data_in_database(self, index, value):
         """
@@ -342,10 +336,8 @@ class AccountsModel(ATableModel):
             stmt = select(CFAccount).where(CFAccount.id == accounts_id)
             accounts = session.scalars(stmt).first()
 
-            if self.get_column_index("Operators") == index.column():
-                accounts.operator = value
-            elif self.get_column_index("Tips") == index.column():
-                accounts.entry_type = value
+            if self.get_column_index("Tips") == index.column():
+                accounts.cash_type = value
             elif self.get_column_index("V/G konts") == index.column():
                 accounts.account = value
 

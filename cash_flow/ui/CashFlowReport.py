@@ -48,10 +48,11 @@ class CashFlowReport(QWidget):
         filterbox_through.addWidget(self.filter_dateThrough)
         label_freq = QLabel("Periodiskums")
         self.freq_map = {
-            "Nedēļa": "W-SUN",
-            "Mēnesis": "M",
-            "Kvartāls": "Q",
-            "Gads": "Y"
+            "Diena": "day",
+            "Nedēļa": "week",
+            "Mēnesis": "month",
+            "Kvartāls": "quarter",
+            "Gads": "year"
         }
         self.filter_Frequency = QComboBox(self)
         self.filter_Frequency.addItems(self.freq_map.keys())
@@ -121,88 +122,183 @@ class CashFlowReport(QWidget):
 
 class CashFlowReportModel(ATableModel):
 
-    def requery(self):
-        self.beginResetModel()
+    def _do_requery(self):
 
         # Setup filters
         date_from = self.FILTER["date from"].strftime("%Y-%m-%d")
         date_through = self.FILTER["date through"].strftime("%Y-%m-%d")
-        report_period = self.FILTER["frequency"]
+        period = self.FILTER["frequency"]
+
+        # Mapping period to offset (end of period)
+        period_offsets = {
+            "day": pd.offsets.Day(0),
+            "week": pd.offsets.Week(weekday=6),  # Sunday
+            "month": pd.offsets.MonthEnd(0),
+            "quarter": pd.offsets.QuarterEnd(startingMonth=12),
+            "year": pd.offsets.YearEnd(0)
+        }
+        date_offset = period_offsets.get(period, pd.offsets.MonthEnd(0))
+        date_freq = {
+            "day": "D",
+            "week": "W-SUN",  # Sunday
+            "month": "ME",
+            "quarter": "QE",
+            "year": "YE"
+        }
+        date_frequency = date_freq.get(period, "ME")
 
         # Load all data from database
 
-        bank_df = pd.read_sql_query(
-            'SELECT * FROM G09_CashFlow_Actual WHERE d_date >= "' + date_from + '" AND d_date <= "' + date_through + '" ',
+        actual = pd.read_sql_query(
+            'SELECT * FROM G10_CashFlow_Actual_Corresponding WHERE d_date >= "' + date_from + '" AND d_date <= "' + date_through + '" ',
             self.engine)
-        cash_df = pd.read_sql_query('SELECT * FROM G02_CashTransactions WHERE d_date <= "' + date_through + '" ',
-                                    self.engine)
+        pending = pd.read_sql_query(
+            'SELECT * FROM G12_CashFlow_Pending_Corresponding WHERE p_date >= "' + date_from + '" AND p_date <= "' + date_through + '" ',
+            self.engine)
+        budgeted = pd.read_sql_query(
+            'SELECT * FROM F01_BudgetEntries WHERE date >= "' + date_from + '" AND date <= "' + date_through + '" ',
+            self.engine)
+        cash = pd.read_sql_query('SELECT * FROM G02_CashTransactions WHERE d_date <= "' + date_through + '" ', self.engine)
         definition_df = pd.read_sql_table("E01_CashFlowDefinition", self.engine)
+
+        definition_accounts_df = pd.read_sql_table("E01_CashFlowDefinitionAccounts", self.engine)
+        definition_totals_df = pd.read_sql_table("E01_CashFlowDefinitionTotals", self.engine)
+
+        # Ensure required columns and formats
+
+        actual['period_end'] = pd.to_datetime(actual['d_date'], format='mixed') + date_offset
+        actual['cf_amount'] = np.where(actual['gl_entry_type'] == 'CR', actual['gl_amount_LC'], -actual['gl_amount_LC'])
+        pending['period_end'] = pd.to_datetime(pending['p_date'], format='mixed') + date_offset
+        pending['cf_amount'] = np.where(pending['gl_entry_type'] == 'CR', pending['gl_amount_LC'],
+                                        -pending['gl_amount_LC'])
+        budgeted['period_end'] = pd.to_datetime(budgeted['date'], format='mixed') + date_offset
+        budgeted['cf_amount'] = np.where(budgeted['cash_type'] == 'Receipt', budgeted['amount_LC'],
+                                         -budgeted['amount_LC'])
+        cash['period_end'] = pd.to_datetime(cash['d_date'], format='mixed') + date_offset
+        cash['cf_amount'] = np.where(cash['gl_entry_type'] == 'DR', cash['gl_amount_LC'], -cash['gl_amount_LC'])
+
         definition_df.rename(columns={"id": "definition_id"}, inplace=True)
         definition_acc_df = definition_df[definition_df["definition_type"] == 1]
         definition_tot_df = definition_df[definition_df["definition_type"] == 2]
         definition_bal_df = definition_df[definition_df["definition_type"] == 3]
-        definition_accounts_df = pd.read_sql_table("E01_CashFlowDefinitionAccounts", self.engine)
-        definition_totals_df = pd.read_sql_table("E01_CashFlowDefinitionTotals", self.engine)
 
-        # ********************** (1) Start working with sums based on filtered accounts *******************************
+        # -------------------------------------------------------------------
+        # ************** (1) CashFlow based on accounts definitions *********
+        # -------------------------------------------------------------------
+
+        #  Prepare chart of CF definitions
+
         # Merge accounts into accounts definition
-
         definition_accounts_df = pd.merge(
             definition_acc_df,
             definition_accounts_df,
             on="definition_id", how="left")
         definition_accounts_df.drop(columns=["id"], inplace=True)
 
-        # Merge accounts definition into bank transactions
+        actual = pd.merge(definition_accounts_df,
+                          actual,
+                          left_on=['cash_type', 'account'],  # Columns in definition_df
+                          right_on=['cash_type', 'gl_account'],  # Corresponding columns in transactions_df
+                          how='left'
+                          )
 
-        merged_df = pd.merge(definition_accounts_df,
-                             bank_df,
-                             left_on=['entry_type', 'account'],  # Columns in definition_df
-                             right_on=['gl_entry_type', 'gl_account'],  # Corresponding columns in transactions_df
-                             how='left'
-                             )
+        pending = pd.merge(definition_accounts_df,
+                           pending,
+                           left_on=['cash_type', 'account'],  # Columns in definition_df
+                           right_on=['cash_type', 'gl_account'],  # Corresponding columns in transactions_df
+                           how='left'
+                           )
 
-        # Add column adjusted_amount_LC based on operator + / -
+        budgeted = pd.merge(definition_acc_df,
+                            budgeted,
+                            left_on=['definition_id'],  # Columns in definition_df
+                            right_on=['definition_id'],  # Corresponding columns in transactions_df
+                            how='left'
+                            )
 
-        merged_df['adjusted_amount_LC'] = np.where(
-            merged_df['operator'] == '+',
-            merged_df['gl_amount_LC'],
-            -merged_df['gl_amount_LC']
-        )
+        # -------------------
+        # GROUP & MERGE
+        # -------------------
+        def get_period_totals(df, label):
+            grouped = df.groupby(['definition_id', 'period_end', 'cash_type'])['cf_amount'].sum().unstack(fill_value=0)
+            columns = ["Receipt", "Payment"]
+            grouped = grouped.reindex(columns=columns, fill_value=0)
+            grouped.columns = [f"{label}_{col}" for col in grouped.columns]
+            return grouped
 
-        # Convert d_date to_datetime if not done yet
+        actual_period = get_period_totals(actual, 'Actual')
+        pending_period = get_period_totals(pending, 'Pending')
+        budgeted_period = get_period_totals(budgeted, 'Budgeted')
 
-        merged_df['d_date'] = pd.to_datetime(merged_df['d_date'])
+        # Combine all
+        combined = actual_period.join(pending_period, how='outer') \
+            .join(budgeted_period, how='outer') \
+            .fillna(0).reset_index()
 
-        # Convert adjusted_amount_LC to_numeric if not done yet
+        # -------------------
+        # SPLIT PAST / FUTURE
+        # -------------------
+        today = pd.to_datetime(date.today())
+        this_period_end = today + date_offset
 
-        merged_df['adjusted_amount_LC'] = pd.to_numeric(merged_df['adjusted_amount_LC'], errors='coerce')
+        # Split
+        past = combined[combined['period_end'] < this_period_end]
+        future = combined[combined['period_end'] >= this_period_end]
 
-        # Add column for period reference
+        # -------------------
+        # CASHFLOW LOGIC
+        # -------------------
 
-        merged_df["d_period"] = merged_df['d_date'].dt.to_period(report_period).apply(
-            lambda r: r.to_timestamp(how='end').normalize() if pd.notna(r) else pd.NaT)
+        # For past: use only actuals
+        past['income'] = past.get('Actual_Receipt', 0)
+        past['expense'] = past.get('Actual_Payment', 0)
 
-        # Pivot values based on definition_id and d_period
+        # For future: use max(budgeted, actual+pending)
+        future['actual_plus_pending_income'] = future.get('Actual_Receipt', 0) + future.get('Pending_Receipt', 0)
+        future['actual_plus_pending_expense'] = future.get('Actual_Payment', 0) + future.get('Pending_Payment', 0)
 
-        pivot_df = merged_df.pivot_table(
+        future['income'] = future[['Budgeted_Receipt', 'actual_plus_pending_income']].max(axis=1)
+        future['expense'] = future[['Budgeted_Payment', 'actual_plus_pending_expense']].min(axis=1)
+
+        # Combine
+        cashflow = pd.concat([past, future], ignore_index=True)
+        cashflow['net_cashflow'] = cashflow['income'] + cashflow['expense']
+
+        # -------------------
+        # CASHFLOW OUTPUT
+        # -------------------
+
+        # Pivot first
+        pivot_cf = cashflow.pivot_table(
             index='definition_id',
-            columns='d_period',
-            values='adjusted_amount_LC',
-            aggfunc="sum",
-            fill_value=0,
-            dropna=False
-        )
-        # Add all periods in range if some are missing
+            columns='period_end',
+            values='net_cashflow',
+            aggfunc='sum'
+        ).fillna(0)
 
-        all_periods = pd.date_range(start=date_from, end=date_through, freq=report_period)
-        pivot_df = pivot_df.reindex(columns=all_periods, fill_value=0)
+        # Fill missing periods
 
-        # Ensure columns are in datetime format before formatting
-        pivot_df.columns = pd.to_datetime(pivot_df.columns, errors='coerce')
+        # Build full period range
+        min_period = cashflow['period_end'].min()
+        max_period = cashflow['period_end'].max()
 
+        all_periods = pd.date_range(start=min_period, end=max_period, freq=date_frequency)
 
+        # Reindex pivot to include all periods
+        pivot_cf = pivot_cf.reindex(columns=all_periods, fill_value=0)
+
+        # Sort columns just in case
+        pivot_cf = pivot_cf.sort_index(axis=1)
+
+        # Ensure 0 instead of NaN in empty cells
+        pivot_cf = pd.merge(definition_acc_df["definition_id"], pivot_cf, left_on="definition_id",
+                            right_on="definition_id", how="left").fillna(0)
+        pivot_cf.set_index("definition_id", inplace=True)
+
+        # -----------------------------------------------------------------------------------------------------------------
         # ********************** (2) Start working with totals based on totaled definitions *******************************
+        # -----------------------------------------------------------------------------------------------------------------
+
         # Merge totals into totals definition
         definition_totals_df = pd.merge(
             definition_tot_df,
@@ -212,106 +308,128 @@ class CashFlowReportModel(ATableModel):
 
         # Merge totals definition with summarized accounts pivot
 
-        merged_totals_df = pd.merge(definition_totals_df,
-                                    pivot_df,
-                                    left_on='definition_summarized',
-                                    right_on='definition_id',
-                                    how='left'
-                                    )
-
-        # Add multiplication num for operator
-
-        merged_totals_df['op_num'] = merged_totals_df['operator'].map({'+': 1, '-': -1})
+        merged_totals = pd.merge(definition_totals_df,
+                                 pivot_cf,
+                                 left_on='definition_summarized',
+                                 right_on='definition_id',
+                                 how='left'
+                                 )
 
         # Drop unnecessary columns
 
-        merged_totals_df.drop(columns=['key', 'definition_type', 'name', 'operator', 'definition_summarized'],
-                              inplace=True)
+        merged_totals.drop(columns=['key', 'definition_type', 'name', 'definition_summarized'], inplace=True)
 
         # Choose value_columns for further summarization
 
-        value_columns = [col for col in merged_totals_df.columns if col not in ['definition_id', 'op_num']]
+        value_columns = [col for col in merged_totals.columns if col not in ['definition_id']]
 
-        # Summarize value_columns based on group value and op_num
+        # Summarize value_columns based on group value
 
-        summarized_totals_df = (
-            merged_totals_df.groupby('definition_id', group_keys=False)[value_columns + ['op_num']]
-            .apply(lambda group: pd.Series(
-                (group['op_num'].to_numpy()[:, None] * group[value_columns].to_numpy()).sum(axis=0),
-                index=value_columns
-            ))
-            # .reset_index()
-        )
-        summarized_totals_df.fillna(0, inplace=True)
+        summarized_totals = merged_totals.groupby('definition_id', group_keys=False)[value_columns].sum()
+
+        # .reset_index()
+
+        summarized_totals.fillna(0, inplace=True)
+
+        # ------------------------------------------------------------------------------------------------------------
         # ********************** (3) Start working with balances on end of each period *******************************
+        # ------------------------------------------------------------------------------------------------------------
 
-        # Convert d_date to_datetime if not yet
-        cash_df['d_date'] = pd.to_datetime(cash_df['d_date'])
+        # ----------------------------
+        # STEP 1: Prepare actual_bank
+        # ----------------------------
 
-        # Initialize cumulative balance
-        cumulative_balance = 0
-        balances = []
+        # Group and sort actual bank balance by period
+        cash_by_period = cash.groupby('period_end')['cf_amount'].sum().sort_index()
+        cumulative_cash = cash_by_period.cumsum()
 
-        # Start index for efficient filtering
-        start_idx = 0
+        # ----------------------------
+        # STEP 2: Determine cutoff
+        # ----------------------------
 
-        for eoperiod in value_columns:
-            # Filter only new transactions from the last weekend up to the current one
-            new_transactions = cash_df[(cash_df.index >= start_idx) & (cash_df['d_date'] <= eoperiod)]
+        # All period_end columns from pivot_cf
+        all_periods = pivot_cf.columns.sort_values()
 
-            # If there are new transactions, update cumulative balance
-            if not new_transactions.empty:
-                cumulative_balance += new_transactions.apply(
-                    lambda row: row['gl_amount_LC'] if row['gl_entry_type'] == 'DR' else -row['gl_amount_LC'], axis=1
-                ).sum()
+        # Identify past and future periods
+        past_periods = all_periods[all_periods < this_period_end]
+        future_periods = all_periods[all_periods >= this_period_end]
 
-                # Move the start index forward to avoid redundant calculations
-                start_idx = new_transactions.index[-1] + 1
+        # ----------------------------
+        # STEP 3: Build closing balance series
+        # ----------------------------
 
-                # Store balance for the current weekend
-            balances.append(cumulative_balance)
+        # Closing balance for past: from cumulative actual bank
+        past_closing = cumulative_cash.reindex(past_periods, method='ffill').fillna(0)
 
-        # Create a DataFrame with periods as columns
-        balances_df = pd.DataFrame([balances], columns=value_columns)
+        # Starting point for future: last known balance
+        last_past_balance = past_closing.iloc[-1] if not past_closing.empty else 0
+
+        # Future cashflows from pivot_cf
+        cashflow_by_period = pivot_cf.sum(axis=0)
+
+        # Compute future balances
+        future_closing = {}
+        balance = last_past_balance
+        for period in future_periods:
+            balance += cashflow_by_period.get(period, 0)
+            future_closing[period] = balance
+
+        # Combine both into full closing balance series
+        full_closing_balance = pd.Series(dtype=float)
+        full_closing_balance = pd.concat([
+            past_closing,
+            pd.Series(future_closing)
+        ]).reindex(all_periods, fill_value=0)
+
+        # Create a new DataFrame with closing balances only
+        balances = pd.DataFrame(
+            [full_closing_balance],  # one row
+            index=[0]  # index = 0
+        )
 
         # Create a new DataFrame with repeated rows for each definition_id
-        balances_df = pd.merge(definition_bal_df["definition_id"], balances_df, how='cross')
-        balances_df = balances_df.set_index("definition_id")
+        balances = pd.merge(definition_bal_df["definition_id"], balances, how='cross')
+        balances = balances.set_index("definition_id")
 
-        # ********************** (3) Put together summarized accounts, totals and balances on end of each period *******************************
+        # ---------------------------------------------------------------------------------------------------------------------------------------
+        # ********************** (4) Put together summarized accounts, totals and balances on end of each period *******************************
+        # ---------------------------------------------------------------------------------------------------------------------------------------
 
         # Concatenate it all together
-        report_df = pd.concat([pivot_df, summarized_totals_df, balances_df])
+        report = pd.concat([pivot_cf, summarized_totals, balances])
 
-        # ********************** (4) Prepare report for visual appearance *******************************
+        # -------------------------------------
+        # Prepare report for visual appearance
+        # -------------------------------------
 
         # Merge report definition header with report
-        report_df = pd.merge(definition_df, report_df, left_on="definition_id", right_on="definition_id", how="left")
+        report = pd.merge(definition_df, report, left_on="definition_id", right_on="definition_id", how="left")
 
         # Sort based on key value
-        report_df.sort_values("key", inplace=True)
+        report.sort_values("key", inplace=True)
 
         # Subtract report formatting in separate dataframe
-        format_df = report_df["definition_type"]
+        format_df = report["definition_type"]
 
         # Prepare report_df for visual appearance
 
-        report_df.drop(columns=["definition_id", "key", "definition_type"], inplace=True)
-        report_df.set_index("name", inplace=True)
+        report.drop(columns=["definition_id", "key", "definition_type"], inplace=True)
+        report.set_index("name", inplace=True)
 
         # Format column headers to show only the date part
-        report_df.columns = [col.strftime(date_format()) if not pd.isnull(col) else col for col in report_df.columns]
+        report.columns = [col.strftime(date_format()) if not pd.isnull(col) else col for col in report.columns]
 
         self.FORMAT = format_df
-        self.DATA = report_df
+        return report
 
-        self.endResetModel()
+
 
     def headerData(self, section: int, orientation: Qt.Orientation, role: int = Qt.ItemDataRole.DisplayRole):
         if orientation == Qt.Orientation.Horizontal:
             if role == Qt.ItemDataRole.DisplayRole:
                 value = self.DATA.columns[section]
                 return self._format_value(value, role)
+            return None
         elif orientation == Qt.Orientation.Vertical:
             if role == Qt.ItemDataRole.DisplayRole:
                 value = self.DATA.index[section]
@@ -321,6 +439,9 @@ class CashFlowReportModel(ATableModel):
                     return QBrush(Qt.GlobalColor.darkBlue)
                 elif self.FORMAT.iloc[section] == 3: # Balances
                     return QBrush(Qt.GlobalColor.darkCyan)
+                return None
+            return None
+        return None
 
     def _format_background(self, index, role=Qt.ItemDataRole.BackgroundRole):
         def_type = self.FORMAT.iloc[index.row()]
@@ -329,3 +450,5 @@ class CashFlowReportModel(ATableModel):
                 return QBrush(Qt.GlobalColor.darkBlue)
             elif def_type == 3: # Balances
                 return QBrush(Qt.GlobalColor.darkCyan)
+            return None
+        return None

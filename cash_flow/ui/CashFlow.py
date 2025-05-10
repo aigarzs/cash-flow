@@ -14,7 +14,6 @@ from cash_flow.ui.CustomersInvoicesCleared import CustomersInvoicesCleared
 from cash_flow.ui.CustomersInvoicesUncleared import CustomersInvoicesUncleared
 from cash_flow.ui.CustomersPayments import CustomersPayments
 from cash_flow.ui.Demo import Demo
-from cash_flow.ui.PlannedAnonymousOperations import PlannedAnonymousOperations
 from cash_flow.ui.Vendors import Vendors
 from cash_flow.ui.VendorsCreditnotes import VendorsCreditnotes
 from cash_flow.ui.VendorsInvoicesCleared import VendorsInvoicesCleared
@@ -30,7 +29,7 @@ class CashFlow(QApplication):
         self.setup_ui()
         self.setup_translations()
         self.ui.show()
-        self.open_CashFlowReport()
+        self.open_CashFlowDefinition()
 
     def setup_ui(self):
         tabs = self.ui.tabWidget
@@ -48,7 +47,6 @@ class CashFlow(QApplication):
         self.ui.button_VendorsCreditnotes.clicked.connect(self.open_VendorsCreditnotes)
         self.ui.button_CashFlowReport.clicked.connect(self.open_CashFlowReport)
         self.ui.button_CashFlowDefinition.clicked.connect(self.open_CashFlowDefinition)
-        self.ui.button_PlannedAnonymousOperations.clicked.connect(self.open_PlannedAnonymousOperations)
         self.ui.button_Budget.clicked.connect(self.open_Budget)
         self.ui.button_Demo.clicked.connect(self.open_Demo)
 
@@ -60,11 +58,6 @@ class CashFlow(QApplication):
     def open_Budget(self):
         tabs = self.ui.tabWidget
         i = tabs.addTab(Budget(self.engine), "Budžets")
-        tabs.setCurrentIndex(i)
-
-    def open_PlannedAnonymousOperations(self):
-        tabs = self.ui.tabWidget
-        i = tabs.addTab(PlannedAnonymousOperations(self.engine), "Plānotas anonīmas operācijas")
         tabs.setCurrentIndex(i)
 
     def open_Demo(self):
