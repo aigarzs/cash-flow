@@ -1,13 +1,19 @@
 from datetime import date, datetime
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QBrush
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QDateEdit, QLabel, QComboBox, QPushButton, QFileDialog
+from PyQt6.QtGui import QBrush, QPalette
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QDateEdit, QLabel, QComboBox, QPushButton, QFileDialog, \
+    QTabWidget, QCheckBox
 
 import pandas as pd
 import numpy as np
 from openpyxl.reader.excel import load_workbook
 from openpyxl.styles import Alignment, PatternFill, Font
+
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+import matplotlib.pyplot as plt
+import mplcursors
+
 
 from cash_flow.ui.AWidgets import ATable, ATableModel
 from cash_flow.util.Converters import date_format
@@ -20,11 +26,7 @@ class CashFlowReport(QWidget):
         super().__init__(parent)
         self.engine = engine
         vbox = QVBoxLayout()
-        toolbox = QHBoxLayout()
-        btn_excel = QPushButton("Export to Excel")
-        btn_excel.clicked.connect(self.export_to_excel)
-        toolbox.addStretch()
-        toolbox.addWidget(btn_excel)
+
         filterbox_from = QHBoxLayout()
         filterbox_through = QHBoxLayout()
         filterbox_freq = QHBoxLayout()
@@ -60,18 +62,56 @@ class CashFlowReport(QWidget):
         self.filter_Frequency.currentIndexChanged.connect(self.requery)
         filterbox_freq.addWidget(label_freq)
         filterbox_freq.addWidget(self.filter_Frequency)
-        label_cashflow = QLabel("Naudas plūsma")
-        label_cashflow.setStyleSheet("font-weight: bold")
+
+        table_widget = QWidget()
+        table_box = QVBoxLayout()
+        table_toolbox = QHBoxLayout()
+        btn_excel = QPushButton("Eksportēt uz Excel")
+        btn_excel.clicked.connect(self.export_to_excel)
+        table_toolbox.addStretch()
+        table_toolbox.addWidget(btn_excel)
         self.table = ATable()
         self.table.setModel(CashFlowReportModel(self.table, self.engine))
+        table_box.addLayout(table_toolbox)
+        table_box.addWidget(self.table)
+        table_widget.setLayout(table_box)
 
-        vbox.addLayout(toolbox)
+        graph_widget = QWidget()
+        graph_layout = QVBoxLayout(self)
+
+        # Add export button
+        graph_toolbox = QHBoxLayout()
+        label_legend = QLabel("Rādīt leģendu")
+        check_legend = QCheckBox()
+        check_legend.setChecked(True)
+        self.show_legend = True
+        check_legend.stateChanged.connect(self.toggle_legend)
+        btn_jpg = QPushButton("Eksportēt uz JPG")
+        btn_jpg.clicked.connect(self.export_to_jpg)
+        graph_toolbox.addWidget(label_legend)
+        graph_toolbox.addWidget(check_legend)
+        graph_toolbox.addStretch()
+        graph_toolbox.addWidget(btn_jpg)
+        self.canvas = FigureCanvas(plt.Figure(figsize=(12, 6)))
+        self.cursor_bars = None
+        # self.cursor_lines = None
+        self.bar_artists = []
+        self.annotations = []
+        self.canvas.mpl_connect("button_press_event", self.hide_tooltips)
+
+        graph_layout.addLayout(graph_toolbox)
+        graph_layout.addWidget(self.canvas)
+        graph_widget.setLayout(graph_layout)
+
+        tabs = QTabWidget()
+        tabs.addTab(table_widget, "Naudas plūsmas atskaite")
+        tabs.addTab(graph_widget, "Naudas plūsmas grafiks")
+
         vbox.addWidget(label_filter)
         vbox.addLayout(filterbox_from)
         vbox.addLayout(filterbox_through)
         vbox.addLayout(filterbox_freq)
-        vbox.addWidget(label_cashflow)
-        vbox.addWidget(self.table)
+        vbox.addWidget(tabs)
         self.setLayout(vbox)
         self.requery()
 
@@ -81,6 +121,7 @@ class CashFlowReport(QWidget):
         self.table.model().set_filter({"date from": self.filter_dateFrom.date().toPyDate(),
                                        "date through": self.filter_dateThrough.date().toPyDate(),
                                        "frequency": freq})
+        self.plot_cashflow()
 
     def export_to_excel(self):
         file_name, _ = QFileDialog.getSaveFileName(self, "Save Excel File", "", "Excel Files (*.xlsx);;All Files (*)")
@@ -119,6 +160,125 @@ class CashFlowReport(QWidget):
 
             wb.save(file_name)
             # print(f"Data exported to {file_name} with formatting.")
+
+    def export_to_jpg(self):
+        self.hide_tooltips()
+        file_path, _ = QFileDialog.getSaveFileName(self, "Save Image", "", "JPG files (*.jpg);;All Files (*)")
+        if file_path:
+            original_facecolor = self.canvas.figure.get_facecolor()
+            self.canvas.figure.set_facecolor('white')
+            self.canvas.figure.savefig(file_path, format='jpg')
+            self.canvas.figure.set_facecolor(original_facecolor)
+            self.plot_cashflow()
+
+    def toggle_legend(self, state):
+        if state == Qt.CheckState.Checked.value:
+            self.show_legend = True
+        else:
+            self.show_legend = False
+
+        self.plot_cashflow()
+
+    def hide_tooltips(self, event=None):
+        for ann in self.annotations:
+            ann.set_visible(False)
+        self.annotations.clear()
+        self.canvas.draw_idle()
+
+
+    def plot_cashflow(self):
+        print("plot_cashflow()")
+        df = self.table.model().graph_pivot
+        self.canvas.figure.clf()
+        ax = self.canvas.figure.add_subplot(111)
+        periods = df.columns
+        x = np.arange(len(periods))
+
+        pos_bottom = np.zeros(len(periods))
+        neg_bottom = np.zeros(len(periods))
+        colors = plt.cm.tab20.colors
+
+        self.bar_artists = []
+        self.annotations = []
+
+        for i, account in enumerate(df.index):
+            values = df.loc[account].values
+            bar_vals = []
+            bar_bottom = []
+
+            for j, val in enumerate(values):
+                if val >= 0:
+                    bar_bottom.append(pos_bottom[j])
+                    pos_bottom[j] += val
+                else:
+                    bar_bottom.append(neg_bottom[j])
+                    neg_bottom[j] += val
+                bar_vals.append(val)
+
+            bars = ax.bar(
+                x,
+                bar_vals,
+                bottom=bar_bottom,
+                label=account,
+                color=colors[i % len(colors)]
+            )
+
+            for idx, bar in enumerate(bars):
+                if bar_vals[idx] != 0:
+                    self.bar_artists.append((bar, account, bar_vals[idx], periods[idx]))
+
+        net_cashflow = df.sum(axis=0).values
+        line1, = ax.plot(x, net_cashflow, color='black', label='Net Cashflow', marker='o', linewidth=2)
+
+        cumulative_balance = net_cashflow.cumsum()
+        line2, = ax.plot(x, cumulative_balance, color='blue', label='Balance', linestyle='--', marker='x',
+                         linewidth=2)
+
+        ax.set_xticks(x)
+        ax.set_xticklabels([p.strftime(date_format()) for p in periods], rotation=25, ha='right')
+        ax.set_ylabel("Amount")
+        ax.set_title("Cash Flow by Account and Period")
+        ax.grid(True)
+        if self.show_legend:
+            ax.legend()
+
+        if self.cursor_bars:
+            self.cursor_bars.remove()
+
+        """
+        if self.cursor_lines:
+            self.cursor_lines.remove()
+        """
+
+        self.cursor_bars = mplcursors.cursor([b[0] for b in self.bar_artists], hover=True)
+
+        @self.cursor_bars.connect("add")
+        def on_add_bar(sel):
+            bar, account, val, period = next((b for b in self.bar_artists if b[0] == sel.artist),
+                                             (None, None, None, None))
+            if bar:
+                sel.annotation.set_text(f"{account}\n{period.strftime(date_format())}\n{val:,.2f}")
+                sel.annotation.get_bbox_patch().set_facecolor(bar.get_facecolor())
+                sel.annotation.get_bbox_patch().set_alpha(0.7)
+                self.annotations.append(sel.annotation)
+
+        """
+        
+        self.cursor_lines = mplcursors.cursor([line1, line2], hover=True)
+
+        @self.cursor_lines.connect("add")
+        def on_add_line(sel):
+            label = line1.get_label() if sel.artist == line1 else line2.get_label()
+            period = periods[int(sel.index)]
+            y = sel.target[1]
+            sel.annotation.set_text(f"{label}\n{period.strftime('%Y-%m-%d')}\n{y:,.2f}")
+            sel.annotation.get_bbox_patch().set_facecolor((1, 1, 1, 0.8))
+            self.annotations.append(sel.annotation)
+        """
+
+        self.canvas.draw()
+
+
 
 class CashFlowReportModel(ATableModel):
 
@@ -289,6 +449,11 @@ class CashFlowReportModel(ATableModel):
 
         # Sort columns just in case
         pivot_cf = pivot_cf.sort_index(axis=1)
+
+        # Store pivot_cf for cash flow figure
+        self.graph_pivot = pd.merge(definition_acc_df, pivot_cf, on="definition_id", how="right")
+        self.graph_pivot.drop(columns=["definition_id", "key", "definition_type"], inplace=True)
+        self.graph_pivot = self.graph_pivot.set_index("name")
 
         # Ensure 0 instead of NaN in empty cells
         pivot_cf = pd.merge(definition_acc_df["definition_id"], pivot_cf, left_on="definition_id",
