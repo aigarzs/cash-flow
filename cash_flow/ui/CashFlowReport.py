@@ -1,7 +1,7 @@
 from datetime import date, datetime
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QBrush, QPalette
+from PyQt6.QtGui import QBrush
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QDateEdit, QLabel, QComboBox, QPushButton, QFileDialog, \
     QTabWidget, QCheckBox
 
@@ -70,7 +70,7 @@ class CashFlowReport(QWidget):
         btn_excel.clicked.connect(self.export_to_excel)
         table_toolbox.addStretch()
         table_toolbox.addWidget(btn_excel)
-        self.table = ATable()
+        self.table = ATable(self)
         self.table.setModel(CashFlowReportModel(self.table, self.engine))
         table_box.addLayout(table_toolbox)
         table_box.addWidget(self.table)
@@ -188,10 +188,11 @@ class CashFlowReport(QWidget):
 
     def plot_cashflow(self):
         print("plot_cashflow()")
-        df = self.table.model().graph_pivot
+        cashflow = self.table.model().graph_pivot
+        balances = self.table.model().graph_balances
         self.canvas.figure.clf()
         ax = self.canvas.figure.add_subplot(111)
-        periods = df.columns
+        periods = cashflow.columns
         x = np.arange(len(periods))
 
         pos_bottom = np.zeros(len(periods))
@@ -201,8 +202,8 @@ class CashFlowReport(QWidget):
         self.bar_artists = []
         self.annotations = []
 
-        for i, account in enumerate(df.index):
-            values = df.loc[account].values
+        for i, account in enumerate(cashflow.index):
+            values = cashflow.loc[account].values
             bar_vals = []
             bar_bottom = []
 
@@ -227,11 +228,10 @@ class CashFlowReport(QWidget):
                 if bar_vals[idx] != 0:
                     self.bar_artists.append((bar, account, bar_vals[idx], periods[idx]))
 
-        net_cashflow = df.sum(axis=0).values
+        net_cashflow = cashflow.sum(axis=0).values
         line1, = ax.plot(x, net_cashflow, color='black', label='Net Cashflow', marker='o', linewidth=2)
 
-        cumulative_balance = net_cashflow.cumsum()
-        line2, = ax.plot(x, cumulative_balance, color='blue', label='Balance', linestyle='--', marker='x',
+        line2, = ax.plot(x, balances, color='blue', label='Balance', linestyle='--', marker='x',
                          linewidth=2)
 
         ax.set_xticks(x)
@@ -280,6 +280,7 @@ class CashFlowReport(QWidget):
 
 
 
+
 class CashFlowReportModel(ATableModel):
 
     def _do_requery(self):
@@ -310,11 +311,9 @@ class CashFlowReportModel(ATableModel):
         # Load all data from database
 
         actual = pd.read_sql_query(
-            'SELECT * FROM G10_CashFlow_Actual_Corresponding WHERE d_date >= "' + date_from + '" AND d_date <= "' + date_through + '" ',
-            self.engine)
+            'SELECT * FROM G10_CashFlow_Actual_Corresponding WHERE d_date <= "' + date_through + '" ', self.engine)
         pending = pd.read_sql_query(
-            'SELECT * FROM G12_CashFlow_Pending_Corresponding WHERE p_date >= "' + date_from + '" AND p_date <= "' + date_through + '" ',
-            self.engine)
+            'SELECT * FROM G12_CashFlow_Pending_Corresponding WHERE p_date <= "' + date_through + '" ', self.engine)
         budgeted = pd.read_sql_query(
             'SELECT * FROM F01_BudgetEntries WHERE date >= "' + date_from + '" AND date <= "' + date_through + '" ',
             self.engine)
@@ -326,15 +325,19 @@ class CashFlowReportModel(ATableModel):
 
         # Ensure required columns and formats
 
-        actual['period_end'] = pd.to_datetime(actual['d_date'], format='mixed') + date_offset
+        actual['period_end'] = pd.to_datetime(actual['d_date'], format='mixed', errors='coerce').apply(
+            lambda d: date_offset.rollforward(d) if pd.notnull(d) else pd.NaT)
         actual['cf_amount'] = np.where(actual['gl_entry_type'] == 'CR', actual['gl_amount_LC'], -actual['gl_amount_LC'])
-        pending['period_end'] = pd.to_datetime(pending['p_date'], format='mixed') + date_offset
+        pending['period_end'] = pd.to_datetime(pending['p_date'], format='mixed', errors='coerce').apply(
+            lambda d: date_offset.rollforward(d) if pd.notnull(d) else pd.NaT)
         pending['cf_amount'] = np.where(pending['gl_entry_type'] == 'CR', pending['gl_amount_LC'],
                                         -pending['gl_amount_LC'])
-        budgeted['period_end'] = pd.to_datetime(budgeted['date'], format='mixed') + date_offset
+        budgeted['period_end'] = pd.to_datetime(budgeted['date'], format='mixed', errors='coerce').apply(
+            lambda d: date_offset.rollforward(d) if pd.notnull(d) else pd.NaT)
         budgeted['cf_amount'] = np.where(budgeted['cash_type'] == 'Receipt', budgeted['amount_LC'],
                                          -budgeted['amount_LC'])
-        cash['period_end'] = pd.to_datetime(cash['d_date'], format='mixed') + date_offset
+        cash['period_end'] = pd.to_datetime(cash['d_date'], format='mixed', errors='coerce').apply(
+            lambda d: date_offset.rollforward(d) if pd.notnull(d) else pd.NaT)
         cash['cf_amount'] = np.where(cash['gl_entry_type'] == 'DR', cash['gl_amount_LC'], -cash['gl_amount_LC'])
 
         definition_df.rename(columns={"id": "definition_id"}, inplace=True)
@@ -399,7 +402,7 @@ class CashFlowReportModel(ATableModel):
         # SPLIT PAST / FUTURE
         # -------------------
         today = pd.to_datetime(date.today())
-        this_period_end = today + date_offset
+        this_period_end = date_offset.rollforward(today)
 
         # Split
         past = combined[combined['period_end'] < this_period_end]
@@ -429,23 +432,23 @@ class CashFlowReportModel(ATableModel):
         # -------------------
 
         # Pivot first
-        pivot_cf = cashflow.pivot_table(
+        pivot_all_periods = cashflow.pivot_table(
             index='definition_id',
             columns='period_end',
             values='net_cashflow',
             aggfunc='sum'
         ).fillna(0)
 
-        # Fill missing periods
+        # Fill missing periods and drop unnecessary
 
-        # Build full period range
-        min_period = cashflow['period_end'].min()
-        max_period = cashflow['period_end'].max()
+       # Build full period range
+        min_period = date_offset.rollforward(pd.to_datetime(date_from))
+        max_period = date_offset.rollforward(pd.to_datetime(date_through))
 
-        all_periods = pd.date_range(start=min_period, end=max_period, freq=date_frequency)
+        report_periods = pd.date_range(start=min_period, end=max_period, freq=date_frequency)
 
-        # Reindex pivot to include all periods
-        pivot_cf = pivot_cf.reindex(columns=all_periods, fill_value=0)
+        # Reindex pivot to include all requested periods
+        pivot_cf = pivot_all_periods.reindex(columns=report_periods, fill_value=0)
 
         # Sort columns just in case
         pivot_cf = pivot_cf.sort_index(axis=1)
@@ -455,7 +458,7 @@ class CashFlowReportModel(ATableModel):
         self.graph_pivot.drop(columns=["definition_id", "key", "definition_type"], inplace=True)
         self.graph_pivot = self.graph_pivot.set_index("name")
 
-        # Ensure 0 instead of NaN in empty cells
+        # Ensure 0 instead of NaN in empty rows
         pivot_cf = pd.merge(definition_acc_df["definition_id"], pivot_cf, left_on="definition_id",
                             right_on="definition_id", how="left").fillna(0)
         pivot_cf.set_index("definition_id", inplace=True)
@@ -500,57 +503,60 @@ class CashFlowReportModel(ATableModel):
         # ********************** (3) Start working with balances on end of each period *******************************
         # ------------------------------------------------------------------------------------------------------------
 
-        # ----------------------------
-        # STEP 1: Prepare actual_bank
-        # ----------------------------
+        # Step 1. Determine periods
+        today = pd.to_datetime(date.today())
+        this_period_end = date_offset.rollforward(today)
+        min_period = date_offset.rollforward(pd.to_datetime(date_from))
+        max_period = date_offset.rollforward(pd.to_datetime(date_through))
+
+        report_periods = pd.date_range(start=min_period, end=max_period, freq=date_frequency)
+
+        # Step 2. Determine past balances
 
         # Group and sort actual bank balance by period
-        cash_by_period = cash.groupby('period_end')['cf_amount'].sum().sort_index()
-        cumulative_cash = cash_by_period.cumsum()
+        actual_cash_by_period = cash.groupby('period_end')['cf_amount'].sum().sort_index()
+        actual_cumulative_cash = actual_cash_by_period.cumsum()
 
-        # ----------------------------
-        # STEP 2: Determine cutoff
-        # ----------------------------
+        if max_period >= this_period_end:
+            past_balances = actual_cumulative_cash[actual_cumulative_cash.index < this_period_end]
+        else:
+            past_balances = actual_cumulative_cash[actual_cumulative_cash.index <= max_period]
 
-        # All period_end columns from pivot_cf
-        all_periods = pivot_cf.columns.sort_values()
+        # Step 3. Determine future balances
 
-        # Identify past and future periods
-        past_periods = all_periods[all_periods < this_period_end]
-        future_periods = all_periods[all_periods >= this_period_end]
+        if min_period >= this_period_end:
+            future_periods = pd.date_range(start=this_period_end, end=max_period, freq=date_frequency)
+        else:
+            future_periods = report_periods[report_periods >= this_period_end]
 
-        # ----------------------------
-        # STEP 3: Build closing balance series
-        # ----------------------------
+        last_actual_balance = past_balances.iloc[-1] if not past_balances.empty else 0
 
-        # Closing balance for past: from cumulative actual bank
-        past_closing = cumulative_cash.reindex(past_periods, method='ffill').fillna(0)
+        # Future cashflows from pivot_all_periods
+        cashflow_by_period = pivot_all_periods.sum(axis=0)
 
-        # Starting point for future: last known balance
-        last_past_balance = past_closing.iloc[-1] if not past_closing.empty else 0
-
-        # Future cashflows from pivot_cf
-        cashflow_by_period = pivot_cf.sum(axis=0)
-
-        # Compute future balances
-        future_closing = {}
-        balance = last_past_balance
+        bal = last_actual_balance
+        future_balances = {}
         for period in future_periods:
-            balance += cashflow_by_period.get(period, 0)
-            future_closing[period] = balance
+            bal += cashflow_by_period.get(period, 0)
+            future_balances[period] = bal
 
-        # Combine both into full closing balance series
-        full_closing_balance = pd.Series(dtype=float)
-        full_closing_balance = pd.concat([
-            past_closing,
-            pd.Series(future_closing)
-        ]).reindex(all_periods, fill_value=0)
+        # Step 4. Combine past and future into all closing balance series, adjust periods
+        all_closing_balances = pd.Series(dtype=float)
+        all_closing_balances = pd.concat([
+            past_balances,
+            pd.Series(future_balances)
+        ]).reindex(report_periods, method="ffill")
+
+        # Step 5. Formating
 
         # Create a new DataFrame with closing balances only
         balances = pd.DataFrame(
-            [full_closing_balance],  # one row
+            [all_closing_balances],  # one row
             index=[0]  # index = 0
         )
+
+        # Store balances for use in Graph
+        self.graph_balances = all_closing_balances.values
 
         # Create a new DataFrame with repeated rows for each definition_id
         balances = pd.merge(definition_bal_df["definition_id"], balances, how='cross')
