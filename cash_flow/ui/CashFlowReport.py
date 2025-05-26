@@ -66,10 +66,10 @@ class CashFlowReport(QWidget):
         table_widget = QWidget()
         table_box = QVBoxLayout()
         table_toolbox = QHBoxLayout()
-        btn_excel = QPushButton("Eksportēt uz Excel")
-        btn_excel.clicked.connect(self.export_to_excel)
+        btn_excel_cashflow = QPushButton("Eksportēt uz Excel")
+        btn_excel_cashflow.clicked.connect(self.export_to_excel_cashflow)
         table_toolbox.addStretch()
-        table_toolbox.addWidget(btn_excel)
+        table_toolbox.addWidget(btn_excel_cashflow)
         self.table = ATable(self)
         self.table.setModel(CashFlowReportModel(self.table, self.engine))
         table_box.addLayout(table_toolbox)
@@ -103,9 +103,23 @@ class CashFlowReport(QWidget):
         graph_layout.addWidget(self.canvas)
         graph_widget.setLayout(graph_layout)
 
+        checkreport_widget = QWidget()
+        checkreport_box = QVBoxLayout()
+        checkreport_toolbox = QHBoxLayout()
+        btn_excel_checkreport = QPushButton("Eksportēt uz Excel")
+        btn_excel_checkreport.clicked.connect(self.export_to_excel_checkreport)
+        checkreport_toolbox.addStretch()
+        checkreport_toolbox.addWidget(btn_excel_checkreport)
+        self.checkreport = ATable(self)
+        self.checkreport.setModel(CheckingReportModel(self.checkreport, self.engine, self.table.model()))
+        checkreport_box.addLayout(checkreport_toolbox)
+        checkreport_box.addWidget(self.checkreport)
+        checkreport_widget.setLayout(checkreport_box)
+
         tabs = QTabWidget()
         tabs.addTab(table_widget, "Naudas plūsmas atskaite")
         tabs.addTab(graph_widget, "Naudas plūsmas grafiks")
+        tabs.addTab(checkreport_widget, "Pārbaudes atskaite")
 
         vbox.addWidget(label_filter)
         vbox.addLayout(filterbox_from)
@@ -122,8 +136,19 @@ class CashFlowReport(QWidget):
                                        "date through": self.filter_dateThrough.date().toPyDate(),
                                        "frequency": freq})
         self.plot_cashflow()
+        self.checkreport.model().requery()
 
-    def export_to_excel(self):
+
+    def export_to_excel_checkreport(self):
+        file_name, _ = QFileDialog.getSaveFileName(self, "Save Excel File", "", "Excel Files (*.xlsx);;All Files (*)")
+
+        if file_name:
+            if not file_name.endswith(".xlsx"):
+                file_name += ".xlsx"
+            # Save DataFrame to Excel
+            self.checkreport.model().DATA.to_excel(file_name, index=True)
+
+    def export_to_excel_cashflow(self):
         file_name, _ = QFileDialog.getSaveFileName(self, "Save Excel File", "", "Excel Files (*.xlsx);;All Files (*)")
 
         if file_name:
@@ -310,14 +335,19 @@ class CashFlowReportModel(ATableModel):
 
         # Load all data from database
 
+        # handling sqlite issues with datetime timepart
+        next_day_date_through = (pd.to_datetime(date_through) + pd.Timedelta(days=1)).strftime('%Y-%m-%d')
+        previous_day_date_from = (pd.to_datetime(date_from) - pd.Timedelta(days=1)).strftime('%Y-%m-%d')
+
         actual = pd.read_sql_query(
-            'SELECT * FROM G10_CashFlow_Actual_Corresponding WHERE d_date <= "' + date_through + '" ', self.engine)
+            'SELECT * FROM G10_CashFlow_Actual_Corresponding WHERE d_date < "' + next_day_date_through + '" ', self.engine)
         pending = pd.read_sql_query(
-            'SELECT * FROM G12_CashFlow_Pending_Corresponding WHERE p_date <= "' + date_through + '" ', self.engine)
+            'SELECT * FROM G12_CashFlow_Pending_Corresponding WHERE p_date < "' + next_day_date_through + '" ', self.engine)
         budgeted = pd.read_sql_query(
-            'SELECT * FROM F01_BudgetEntries WHERE date >= "' + date_from + '" AND date <= "' + date_through + '" ',
+            'SELECT * FROM F01_BudgetEntries WHERE date > "' + previous_day_date_from + '" AND date < "' + next_day_date_through + '" ',
             self.engine)
-        cash = pd.read_sql_query('SELECT * FROM G02_CashTransactions WHERE d_date <= "' + date_through + '" ', self.engine)
+        cash = pd.read_sql_query('SELECT * FROM G02_CashTransactions WHERE d_date < "' + next_day_date_through + '" ',
+                                 self.engine)
         definition_df = pd.read_sql_table("E01_CashFlowDefinition", self.engine)
 
         definition_accounts_df = pd.read_sql_table("E01_CashFlowDefinitionAccounts", self.engine)
@@ -426,6 +456,18 @@ class CashFlowReportModel(ATableModel):
         # Combine
         cashflow = pd.concat([past, future], ignore_index=True)
         cashflow['net_cashflow'] = cashflow['income'] + cashflow['expense']
+
+        # Create and store cashflow checking report
+
+        self.checking_report = pd.merge(definition_acc_df, cashflow, on="definition_id", how="right")
+        self.checking_report.sort_values(["period_end", "key"], inplace=True)
+        self.checking_report.drop(columns=["definition_id", "key", "definition_type"], inplace=True)
+        self.checking_report = self.checking_report.reindex(
+            columns=["period_end", "name", "Actual_Receipt", "Actual_Payment", "Pending_Receipt", "Pending_Payment",
+                     "Budgeted_Receipt", "Budgeted_Payment", "actual_plus_pending_income",
+                     "actual_plus_pending_expense",
+                     "income", "expense", "net_cashflow"])
+        self.checking_report = self.checking_report[self.checking_report["period_end"] >= pd.to_datetime(date_from)]
 
         # -------------------
         # CASHFLOW OUTPUT
@@ -623,3 +665,20 @@ class CashFlowReportModel(ATableModel):
                 return QBrush(Qt.GlobalColor.darkCyan)
             return None
         return None
+
+class CheckingReportModel(ATableModel):
+    def __init__(self, table, engine, cashflow_model):
+        super().__init__(table, engine)
+        self.cashflow_model = cashflow_model
+
+
+    def _do_requery(self):
+        df = self.cashflow_model.checking_report
+        df.columns = ["Perioda beigas", "NP rinda", "Faksts ieņēmumi", "Fakts maksājumi",
+                                        "Sagaidāmie ieņēmumi", "Sagaidāmie maksājumi",
+                                        "Budžeta ieņēmumi", "Budžeta maksājumi", "Fakts plus sagaidāmie ieņēmumi",
+                                        "Fakts plus sagaidāmie maksājumi",
+                                        "Ieņēmumi", "Maksājumi", "Neto naudas plūsma"]
+
+        return df
+
