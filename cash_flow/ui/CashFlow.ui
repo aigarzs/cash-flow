@@ -170,30 +170,9 @@
           </widget>
          </item>
          <item>
-          <widget class="QPushButton" name="button_CashFlowGraph">
-           <property name="text">
-            <string>Naudas plūsmas grafiks</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QPushButton" name="button_PlannedAnonymousOperations">
-           <property name="text">
-            <string>Plānotas anonīmas operācijas</string>
-           </property>
-          </widget>
-         </item>
-         <item>
           <widget class="QPushButton" name="button_Budget">
            <property name="text">
             <string>Budžets</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QPushButton" name="button_Demo">
-           <property name="text">
-            <string>Demo</string>
            </property>
           </widget>
          </item>

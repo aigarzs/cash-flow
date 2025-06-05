@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QDateEdit, QLineEdit, QLabel, QAbstractItemView, \
-    QPushButton, QStackedWidget, QComboBox, QStyledItemDelegate, QItemDelegate
+    QPushButton, QStackedWidget, QComboBox, QStyledItemDelegate, QItemDelegate, QFileDialog
 from sqlalchemy import select, delete
 from sqlalchemy.orm import Session
 
@@ -64,13 +64,17 @@ class BudgetView(QWidget):
         filterbox_freq.addWidget(label_freq)
         filterbox_freq.addWidget(self.filter_Frequency)
         toolsbox = QHBoxLayout()
+        btn_excel = QPushButton("Eksportēt uz Excel")
+        btn_excel.clicked.connect(self.export_to_excel)
         btn_edit = QPushButton("Labot")
         btn_edit.clicked.connect(self.edit_budget)
         toolsbox.addStretch()
+        toolsbox.addWidget(btn_excel)
         toolsbox.addWidget(btn_edit)
         label_CFStructure = QLabel("Naudas Plūsmas Budžets")
         label_CFStructure.setStyleSheet("font-weight: bold")
         self.table = ATable()
+        self.table.doubleClicked.connect(self.double_clicked)
         self.table.setModel(BudgetViewModel(self.table, self.engine))
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
@@ -93,6 +97,9 @@ class BudgetView(QWidget):
                                        "date through": self.filter_dateThrough.date().endOfDay().toPyDateTime(),
                                        "frequency": freq})
 
+    def double_clicked(self, event):
+        self.edit_budget()
+
     def edit_budget(self):
         self.main_view.refresh_view(1)
         self.main_view.details_view.clear_commandsbox()
@@ -108,6 +115,15 @@ class BudgetView(QWidget):
 
         self.main_view.details_view.field_name.setText(name)
         self.main_view.details_view.table.model().set_definition_id(definition_id)
+
+    def export_to_excel(self):
+        file_name, _ = QFileDialog.getSaveFileName(self, "Save Excel File", "", "Excel Files (*.xlsx);;All Files (*)")
+
+        if file_name:
+            if not file_name.endswith(".xlsx"):
+                file_name += ".xlsx"
+            # Save DataFrame to Excel
+            self.table.model().DATA.to_excel(file_name, index=True)
 
 class BudgetViewModel(ATableModel):
 
@@ -155,6 +171,7 @@ class BudgetViewModel(ATableModel):
                              left_on="id", right_on="definition_id", how="left").fillna(0)
         budget_df.sort_values("key", inplace=True)
         budget_df.drop(columns=["definition_type", "key"], inplace=True)
+        budget_df.rename(columns={"name": "NP Nosaukums"}, inplace=True)
         budget_df.set_index("id", inplace=True)
 
         return budget_df
@@ -216,20 +233,21 @@ class DetailsView(QWidget):
         commands_controls.addWidget(self.text_amount)
         commands_controls.addWidget(label_frequency)
         commands_controls.addWidget(self.filter_Frequency)
+        btn_return = QPushButton("Atgriezties")
+        btn_return.clicked.connect(self.return_to_budget)
+        btn_excel = QPushButton("Eksportēt uz Excel")
+        btn_excel.clicked.connect(self.export_to_excel)
         btn_generate = QPushButton("Izveidot")
         btn_generate.clicked.connect(self.generate_amounts)
         btn_delete = QPushButton("Dzēst")
         btn_delete.clicked.connect(self.delete_amounts)
+        commands_buttons.addWidget(btn_return)
         commands_buttons.addStretch()
+        commands_buttons.addWidget(btn_excel)
         commands_buttons.addWidget(btn_generate)
         commands_buttons.addWidget(btn_delete)
         commandsbox.addLayout(commands_controls)
         commandsbox.addLayout(commands_buttons)
-        toolsbox = QHBoxLayout()
-        btn_return = QPushButton("Atgriezties uz budžetu")
-        btn_return.clicked.connect(self.return_to_budget)
-        toolsbox.addStretch()
-        toolsbox.addWidget(btn_return)
         label_details = QLabel("Budžeta ieraksti")
         label_details.setStyleSheet("font-weight: bold")
         self.table = ATable()
@@ -246,7 +264,6 @@ class DetailsView(QWidget):
         vbox.addLayout(filterbox)
         vbox.addWidget(label_createAmounts)
         vbox.addLayout(commandsbox)
-        vbox.addLayout(toolsbox)
         vbox.addWidget(label_details)
         vbox.addWidget(self.table)
         self.setLayout(vbox)
@@ -267,6 +284,16 @@ class DetailsView(QWidget):
         self.text_memo.setText("")
         self.text_amount.setText("")
         self.filter_Frequency.setCurrentText("Mēnesis")
+
+    def export_to_excel(self):
+        file_name, _ = QFileDialog.getSaveFileName(self, "Save Excel File", "", "Excel Files (*.xlsx);;All Files (*)")
+
+        if file_name:
+            if not file_name.endswith(".xlsx"):
+                file_name += ".xlsx"
+            # Save DataFrame to Excel
+            self.table.model().DATA.to_excel(file_name, index=True)
+
 
     def return_to_budget(self):
         self.main_view.budget_view.requery()

@@ -48,8 +48,7 @@ class CashFlow(QApplication):
         self.ui.button_CashFlowReport.clicked.connect(self.open_CashFlowReport)
         self.ui.button_CashFlowDefinition.clicked.connect(self.open_CashFlowDefinition)
         self.ui.button_Budget.clicked.connect(self.open_Budget)
-        self.ui.button_Demo.clicked.connect(self.open_Demo)
-
+        
 
     def setup_translations(self):
         pass
@@ -58,11 +57,6 @@ class CashFlow(QApplication):
     def open_Budget(self):
         tabs = self.ui.tabWidget
         i = tabs.addTab(Budget(self.engine), "Budžets")
-        tabs.setCurrentIndex(i)
-
-    def open_Demo(self):
-        tabs = self.ui.tabWidget
-        i = tabs.addTab(Demo(self.engine), "Demo")
         tabs.setCurrentIndex(i)
 
     def open_CustomersInvoicesUncleared(self):
