@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from cash_flow.database.Model import Document, DocType, Customer
-from cash_flow.ui.AWidgets import ATable, ATableModel_set, ATableModel
+from cash_flow.ui.AWidgets import ATable, ATableModel
 
 
 class CustomersPayments(QWidget):

@@ -232,7 +232,7 @@ def view_cashflow_actual(connection):
                             doc.date AS d_date,
                             doc.number AS d_number,
                             doc.customer_id AS d_customer_id,
-                            doc.vendor_id AS d_vendor_ir,
+                            doc.vendor_id AS d_vendor_id,
                             doc.description AS d_description,
                             cash.d_currency AS d_currency,
                             cash.gl_entry_type AS gl_entry_type,

@@ -1,9 +1,9 @@
 from datetime import date, datetime
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QModelIndex
 from PyQt6.QtGui import QBrush
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QDateEdit, QLabel, QComboBox, QPushButton, QFileDialog, \
-    QTabWidget, QCheckBox
+    QTabWidget, QCheckBox, QApplication, QStackedWidget
 
 import pandas as pd
 import numpy as np
@@ -16,15 +16,23 @@ import mplcursors
 
 
 from cash_flow.ui.AWidgets import ATable, ATableModel
+from cash_flow.ui.Browse_ActualPayment import Browse_ActualPayment
+from cash_flow.ui.Browse_ActualReceipt import Browse_ActualReceipt
+from cash_flow.ui.Browse_BudgetedPayment import Browse_BudgetedPayment
+from cash_flow.ui.Browse_BudgetedReceipt import Browse_BudgetedReceipt
+from cash_flow.ui.Browse_PendingPayment import Browse_PendingPayment
+from cash_flow.ui.Browse_PendingReceipt import Browse_PendingReceipt
 from cash_flow.util.Converters import date_format
 
+from Browse_ActualReceipt import Browse_ActualReceipt
 
 
 class CashFlowReport(QWidget):
 
-    def __init__(self, engine, parent=None):
-        super().__init__(parent)
+    def __init__(self, engine):
+        super().__init__(None)
         self.engine = engine
+
         vbox = QVBoxLayout()
 
         filterbox_from = QHBoxLayout()
@@ -103,23 +111,44 @@ class CashFlowReport(QWidget):
         graph_layout.addWidget(self.canvas)
         graph_widget.setLayout(graph_layout)
 
-        checkreport_widget = QWidget()
+        self.checkreport_stacked = QStackedWidget()
+
+        self.checkreport_widget = QWidget()
         checkreport_box = QVBoxLayout()
         checkreport_toolbox = QHBoxLayout()
+        btn_browse = QPushButton("Izvērst")
+        btn_browse.clicked.connect(self.clicked_browse)
         btn_excel_checkreport = QPushButton("Eksportēt uz Excel")
         btn_excel_checkreport.clicked.connect(self.export_to_excel_checkreport)
         checkreport_toolbox.addStretch()
+        checkreport_toolbox.addWidget(btn_browse)
         checkreport_toolbox.addWidget(btn_excel_checkreport)
-        self.checkreport = ATable(self)
+        self.checkreport = CheckingReportTable(self.requery, self)
         self.checkreport.setModel(CheckingReportModel(self.checkreport, self.engine, self.table.model()))
+        self.checkreport.doubleClicked.connect(self.browse_checkreport)
         checkreport_box.addLayout(checkreport_toolbox)
         checkreport_box.addWidget(self.checkreport)
-        checkreport_widget.setLayout(checkreport_box)
+        self.checkreport_widget.setLayout(checkreport_box)
+
+        self.browse_actual_receipt = Browse_ActualReceipt(self.engine, self.return_checkreport)
+        self.browse_actual_payment = Browse_ActualPayment(self.engine, self.return_checkreport)
+        self.browse_pending_receipt = Browse_PendingReceipt(self.engine, self.return_checkreport)
+        self.browse_pending_payment = Browse_PendingPayment(self.engine, self.return_checkreport)
+        self.browse_budgeted_receipt = Browse_BudgetedReceipt(self.engine, self.return_checkreport)
+        self.browse_budgeted_payment = Browse_BudgetedPayment(self.engine, self.return_checkreport)
+
+        self.checkreport_stacked.addWidget(self.checkreport_widget)
+        self.checkreport_stacked.addWidget(self.browse_actual_receipt)
+        self.checkreport_stacked.addWidget(self.browse_actual_payment)
+        self.checkreport_stacked.addWidget(self.browse_pending_receipt)
+        self.checkreport_stacked.addWidget(self.browse_pending_payment)
+        self.checkreport_stacked.addWidget(self.browse_budgeted_receipt)
+        self.checkreport_stacked.addWidget(self.browse_budgeted_payment)
 
         tabs = QTabWidget()
         tabs.addTab(table_widget, "Naudas plūsmas atskaite")
         tabs.addTab(graph_widget, "Naudas plūsmas grafiks")
-        tabs.addTab(checkreport_widget, "Pārbaudes atskaite")
+        tabs.addTab(self.checkreport_stacked, "Pārbaudes atskaite")
 
         vbox.addWidget(label_filter)
         vbox.addLayout(filterbox_from)
@@ -137,6 +166,41 @@ class CashFlowReport(QWidget):
                                        "frequency": freq})
         self.plot_cashflow()
         self.checkreport.model().requery()
+
+    def return_checkreport(self):
+        self.checkreport_stacked.setCurrentWidget(self.checkreport_widget)
+
+    def clicked_browse(self):
+        selected = self.checkreport.selectedIndexes()
+        if selected:
+            index = selected[0]
+            self.browse_checkreport(index)
+
+    def browse_checkreport(self, index):
+        # print(index.row(), index.column())
+        forms_map = [None,
+                     None,
+                     None,
+                     self.browse_actual_receipt,
+                     self.browse_actual_payment,
+                     self.browse_pending_receipt,
+                     self.browse_pending_payment,
+                     self.browse_budgeted_receipt,
+                     self.browse_budgeted_payment,
+                     None,
+                     None,
+                     None,
+                     None,
+                     None]
+
+        form = forms_map[index.column()]
+        if form:
+            form.table.model().set_filter({"Date_From": self.filter_dateFrom.date().toPyDate(),
+                                           "Date_Through": self.filter_dateThrough.date().toPyDate(),
+                                           "Period_End": self.checkreport.model().DATA.iloc[index.row(), 0],
+                                           "Definition_ID": self.checkreport.model().DATA.iloc[index.row(), 1],
+                                           "Frequency": self.filter_Frequency.currentText()})
+            self.checkreport_stacked.setCurrentWidget(form)
 
 
     def export_to_excel_checkreport(self):
@@ -212,7 +276,7 @@ class CashFlowReport(QWidget):
 
 
     def plot_cashflow(self):
-        print("plot_cashflow()")
+        # print("plot_cashflow()")
         cashflow = self.table.model().graph_pivot
         balances = self.table.model().graph_balances
         self.canvas.figure.clf()
@@ -254,15 +318,15 @@ class CashFlowReport(QWidget):
                     self.bar_artists.append((bar, account, bar_vals[idx], periods[idx]))
 
         net_cashflow = cashflow.sum(axis=0).values
-        line1, = ax.plot(x, net_cashflow, color='black', label='Net Cashflow', marker='o', linewidth=2)
+        line1, = ax.plot(x, net_cashflow, color='black', label='Neto naudas plūsma', marker='o', linewidth=2)
 
-        line2, = ax.plot(x, balances, color='blue', label='Balance', linestyle='--', marker='x',
+        line2, = ax.plot(x, balances, color='blue', label='Bilance', linestyle='--', marker='x',
                          linewidth=2)
 
         ax.set_xticks(x)
         ax.set_xticklabels([p.strftime(date_format()) for p in periods], rotation=25, ha='right')
-        ax.set_ylabel("Amount")
-        ax.set_title("Cash Flow by Account and Period")
+        ax.set_ylabel("Summa BV")
+        ax.set_title("Naudas plūsma pa periodiem")
         ax.grid(True)
         if self.show_legend:
             ax.legend()
@@ -461,9 +525,9 @@ class CashFlowReportModel(ATableModel):
 
         self.checking_report = pd.merge(definition_acc_df, cashflow, on="definition_id", how="right")
         self.checking_report.sort_values(["period_end", "key"], inplace=True)
-        self.checking_report.drop(columns=["definition_id", "key", "definition_type"], inplace=True)
+        self.checking_report.drop(columns=["key", "definition_type"], inplace=True)
         self.checking_report = self.checking_report.reindex(
-            columns=["period_end", "name", "Actual_Receipt", "Actual_Payment", "Pending_Receipt", "Pending_Payment",
+            columns=["period_end", "definition_id", "name", "Actual_Receipt", "Actual_Payment", "Pending_Receipt", "Pending_Payment",
                      "Budgeted_Receipt", "Budgeted_Payment", "actual_plus_pending_income",
                      "actual_plus_pending_expense",
                      "income", "expense", "net_cashflow"])
@@ -666,6 +730,14 @@ class CashFlowReportModel(ATableModel):
             return None
         return None
 
+class CheckingReportTable(ATable):
+    def __init__(self, requery_method, parent=None):
+        super().__init__(parent)
+        self.requery_method = requery_method
+
+    def action_requery(self):
+        self.requery_method()
+
 class CheckingReportModel(ATableModel):
     def __init__(self, table, engine, cashflow_model):
         super().__init__(table, engine)
@@ -674,7 +746,7 @@ class CheckingReportModel(ATableModel):
 
     def _do_requery(self):
         df = self.cashflow_model.checking_report
-        df.columns = ["Perioda beigas", "NP rinda", "Faksts ieņēmumi", "Fakts maksājumi",
+        df.columns = ["Periods", "NP ID", "NP nosaukums", "Fakts ieņēmumi", "Fakts maksājumi",
                                         "Sagaidāmie ieņēmumi", "Sagaidāmie maksājumi",
                                         "Budžeta ieņēmumi", "Budžeta maksājumi", "Fakts plus sagaidāmie ieņēmumi",
                                         "Fakts plus sagaidāmie maksājumi",

@@ -125,8 +125,9 @@ class BudgetViewModel(ATableModel):
         definition_df = pd.read_sql_query("SELECT * FROM E01_CashFlowDefinition WHERE definition_type = 1", self.engine)
 
         budget_entries_df["date"] = pd.to_datetime(budget_entries_df['date'])
-        budget_entries_df["period"] = budget_entries_df["date"].dt.to_period(report_period).apply(
-            lambda r: r.to_timestamp(how='end').normalize() if pd.notna(r) else pd.NaT)
+        offset = offset_map.get(report_period, pd.offsets.MonthEnd(0))
+        budget_entries_df["period"] = pd.to_datetime(budget_entries_df["date"], format="mixed", errors="coerce").apply(
+            lambda d: offset.rollforward(d) if pd.notnull(d) else pd.NaT)
         budget_entries_df['adjusted_amount_LC'] = np.where(
             budget_entries_df['cash_type'] == 'Receipt',
             budget_entries_df['amount_LC'],
@@ -320,11 +321,21 @@ class DetailsView(QWidget):
         self.requery()
 
 frequency_map = {
+            "Diena": "D",
             "Nedēļa": "W-SUN",
-            "Mēnesis": "M",
-            "Kvartāls": "Q",
-            "Gads": "Y"
+            "Mēnesis": "ME",
+            "Kvartāls": "QE",
+            "Gads": "YE"
         }
+
+offset_map = {
+            "D": pd.offsets.Day(0),
+            "W-SUN": pd.offsets.Week(weekday=6),  # Sunday
+            "ME": pd.offsets.MonthEnd(0),
+            "QE": pd.offsets.QuarterEnd(startingMonth=12),
+            "YE": pd.offsets.YearEnd(0)
+        }
+
 
 cash_type_map = {
             "Ieņēmums": "Receipt",

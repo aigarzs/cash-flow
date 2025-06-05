@@ -292,7 +292,3 @@ class ATableModel(QAbstractTableModel):
 
 
 
-
-
-class ATableModel_set(QAbstractTableModel):
-    pass

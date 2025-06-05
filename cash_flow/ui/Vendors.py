@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from cash_flow.database.Model import Vendor
-from cash_flow.ui.AWidgets import ATable, ATableModel_set, ATableModel
+from cash_flow.ui.AWidgets import ATable, ATableModel
 from cash_flow.util.Converters import str_to_priority
 
 

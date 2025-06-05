@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from cash_flow.database.AEngine import engine
 from cash_flow.database.Model import Account
-from cash_flow.ui.AWidgets import ATableModel_set
+
 
 
 # Custom Table Model for Multi-Column ComboBox
