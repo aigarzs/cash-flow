@@ -1,7 +1,6 @@
 from datetime import date, datetime
 
 import pandas as pd
-from PyQt6.QtCore import Qt, QModelIndex
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QDateEdit, QLineEdit, QLabel, QTabWidget
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -127,9 +126,7 @@ class PaymentsClearingModel(ATableModel):
 
 class CustomersPaymentsModel(ATableModel):
 
-    def requery(self):
-
-        self.beginResetModel()
+    def _do_requery(self):
 
         stmt = select(Document.id,
                       DocType.name,
@@ -157,11 +154,11 @@ class CustomersPaymentsModel(ATableModel):
             dataset = session.execute(stmt).all()
 
             # Convert to DataFrame
-            self.DATA = pd.DataFrame(dataset, columns=["id", "Tips", "Numurs", "Klients", "Datums",
+            df = pd.DataFrame(dataset, columns=["id", "Tips", "Numurs", "Klients", "Datums",
                                                        "Summa", "Valūta"])
-            self.DATA.set_index("id", inplace=True)
+            df.set_index("id", inplace=True)
 
-        self.endResetModel()
+        return df
 
 
 

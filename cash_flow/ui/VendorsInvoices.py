@@ -308,7 +308,7 @@ class VendorsInvoicesModel(ATableModel):
 
         # Customer Invoices and Creditnotes
         doctypes = str((DocType.INVOICE_VENDOR, DocType.CREDITNOTE_VENDOR))
-        cash_type = "Receipt"
+        cash_type = "Payment"
 
         #Read database
         invoices = pd.read_sql_query("SELECT * FROM D01_Documents WHERE type_id IN " + doctypes + "", self.engine)
