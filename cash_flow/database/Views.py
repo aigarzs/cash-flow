@@ -15,6 +15,8 @@ def views_all(connection):
     view_cashflow_actual(connection)
     view_cashflow_actual_corresponding(connection)
     view_casflow_pending(connection)
+    view_invoice_reconciliations(connection)
+    view_payment_reconciliations(connection)
 
 
 
@@ -308,6 +310,84 @@ def view_casflow_pending_corresponding(connection):
     connection.execute(text(drop))
     connection.execute(text(create))
 
+
+def view_invoice_reconciliations(connection):
+    drop = "DROP VIEW IF EXISTS H01_Invoice_Reconciliations"
+    create = """CREATE VIEW H01_Invoice_Reconciliations AS
+                SELECT 
+                    r.id,
+                    r.invoice_id,
+                    r.payment_id,
+                    p.type_id AS p_type_id,    
+                    t.name AS p_type_name,
+                    p.number AS p_number,
+                    p.date AS p_date,
+                    p.description AS p_description,
+                    p.customer_id AS p_customer_id,
+                    c.name AS p_customer_name,
+                    p.vendor_id AS p_vendor_id,
+                    v.name AS p_vendor_name,
+                    r.amount AS r_amount,
+                    r.currency AS r_currency,
+                    p.amount AS p_amount,
+                    p.currency AS p_currency
+    
+    
+                FROM
+                    D04_Reconciliations AS r 
+                LEFT JOIN
+                    D01_Documents AS p ON r.payment_id = p.id
+                LEFT JOIN
+                    D02_DocTypes AS t on p.type_id = t.id
+                LEFT JOIN
+                    B04_Customers AS c ON p.customer_id = c.id
+                LEFT JOIN
+                    B05_Vendors AS v ON p.vendor_id = v.id
+                    
+                ORDER BY p.date DESC, r.payment_id
+                """
+
+    connection.execute(text(drop))
+    connection.execute(text(create))
+
+
+def view_payment_reconciliations(connection):
+    drop = "DROP VIEW IF EXISTS H02_Payment_Reconciliations"
+    create = """CREATE VIEW H02_Payment_Reconciliations AS
+                SELECT 
+                    r.id,
+                    r.invoice_id,
+                    r.payment_id,
+                    i.type_id AS i_type_id,    
+                    t.name AS i_type_name,
+                    i.number AS i_number,
+                    i.date AS i_date,
+                    i.description AS i_description,
+                    i.customer_id AS i_customer_id,
+                    c.name AS i_customer_name,
+                    i.vendor_id AS i_vendor_id,
+                    v.name AS i_vendor_name,
+                    r.amount AS r_amount,
+                    r.currency AS r_currency,
+                    i.amount AS i_amount,
+                    i.currency AS i_currency
+    
+                FROM
+                    D04_Reconciliations AS r 
+                LEFT JOIN
+                    D01_Documents AS i ON r.invoice_id = i.id
+                LEFT JOIN
+                    D02_DocTypes AS t on i.type_id = t.id
+                LEFT JOIN
+                    B04_Customers AS c ON i.customer_id = c.id
+                LEFT JOIN
+                    B05_Vendors AS v ON i.vendor_id = v.id
+                    
+                ORDER BY i.date, r.invoice_id
+                """
+
+    connection.execute(text(drop))
+    connection.execute(text(create))
 
 
 if __name__ == "__main__":

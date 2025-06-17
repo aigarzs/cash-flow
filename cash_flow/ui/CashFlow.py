@@ -9,15 +9,11 @@ from cash_flow.ui.Budget import Budget
 from cash_flow.ui.CashFlowReport import CashFlowReport
 from cash_flow.ui.CashFlowDefinition import CashFlowDefinition
 from cash_flow.ui.Customers import Customers
-from cash_flow.ui.CustomersCreditnotes import CustomersCreditnotes
-from cash_flow.ui.CustomersInvoicesCleared import CustomersInvoicesCleared
-from cash_flow.ui.CustomersInvoicesUncleared import CustomersInvoicesUncleared
+from cash_flow.ui.CustomersInvoices import CustomersInvoices
 from cash_flow.ui.CustomersPayments import CustomersPayments
 from cash_flow.ui.Demo import Demo
 from cash_flow.ui.Vendors import Vendors
-from cash_flow.ui.VendorsCreditnotes import VendorsCreditnotes
-from cash_flow.ui.VendorsInvoicesCleared import VendorsInvoicesCleared
-from cash_flow.ui.VendorsInvoicesUncleared import VendorsInvoicesUncleared
+from cash_flow.ui.VendorsInvoices import VendorsInvoices
 from cash_flow.ui.VendorsPayments import VendorsPayments
 
 
@@ -35,16 +31,12 @@ class CashFlow(QApplication):
         tabs = self.ui.tabWidget
         tabs.tabCloseRequested.connect(lambda index: tabs.removeTab(index))
 
-        self.ui.button_CustomersInvoicesUncleared.clicked.connect(self.open_CustomersInvoicesUncleared)
-        self.ui.button_CustomersInvoicesCleared.clicked.connect(self.open_CustomersInvoicesCleared)
+        self.ui.button_CustomersInvoices.clicked.connect(self.open_CustomersInvoices)
         self.ui.button_CustomersPayments.clicked.connect(self.open_CustomersPayments)
-        self.ui.button_CustomersCreditnotes.clicked.connect(self.open_CustomersCreditnotes)
         self.ui.button_Customers.clicked.connect(self.open_Customers)
         self.ui.button_Vendors.clicked.connect(self.open_Vendors)
-        self.ui.button_VendorsInvoicesUncleared.clicked.connect(self.open_VendorsInvoicesUncleared)
-        self.ui.button_VendorsInvoicesCleared.clicked.connect(self.open_VendorsInvoicesCleared)
+        self.ui.button_VendorsInvoices.clicked.connect(self.open_VendorsInvoices)
         self.ui.button_VendorsPayments.clicked.connect(self.open_VendorsPayments)
-        self.ui.button_VendorsCreditnotes.clicked.connect(self.open_VendorsCreditnotes)
         self.ui.button_CashFlowReport.clicked.connect(self.open_CashFlowReport)
         self.ui.button_CashFlowDefinition.clicked.connect(self.open_CashFlowDefinition)
         self.ui.button_Budget.clicked.connect(self.open_Budget)
@@ -59,24 +51,14 @@ class CashFlow(QApplication):
         i = tabs.addTab(Budget(self.engine), "Budžets")
         tabs.setCurrentIndex(i)
 
-    def open_CustomersInvoicesUncleared(self):
+    def open_CustomersInvoices(self):
         tabs = self.ui.tabWidget
-        i = tabs.addTab(CustomersInvoicesUncleared(self.engine), "Neapmaksātie klientu rēķini")
-        tabs.setCurrentIndex(i)
-
-    def open_CustomersInvoicesCleared(self):
-        tabs = self.ui.tabWidget
-        i = tabs.addTab(CustomersInvoicesCleared(self.engine), "Apmaksātie klientu rēķini")
+        i = tabs.addTab(CustomersInvoices(self.engine), "Klientu rēķini")
         tabs.setCurrentIndex(i)
 
     def open_CustomersPayments(self):
         tabs = self.ui.tabWidget
         i = tabs.addTab(CustomersPayments(self.engine), "Klientu maksājumi")
-        tabs.setCurrentIndex(i)
-
-    def open_CustomersCreditnotes(self):
-        tabs = self.ui.tabWidget
-        i = tabs.addTab(CustomersCreditnotes(self.engine), "Klientu kredītrēķini")
         tabs.setCurrentIndex(i)
 
     def open_Customers(self):
@@ -89,24 +71,14 @@ class CashFlow(QApplication):
         i = tabs.addTab(Vendors(self.engine), "Piegādātāji")
         tabs.setCurrentIndex(i)
 
-    def open_VendorsInvoicesUncleared(self):
+    def open_VendorsInvoices(self):
         tabs = self.ui.tabWidget
-        i = tabs.addTab(VendorsInvoicesUncleared(self.engine), "Neapmaksātie piegādātāju rēķini")
-        tabs.setCurrentIndex(i)
-
-    def open_VendorsInvoicesCleared(self):
-        tabs = self.ui.tabWidget
-        i = tabs.addTab(VendorsInvoicesCleared(self.engine), "Apmaksātie piegādātāju rēķini")
+        i = tabs.addTab(VendorsInvoices(self.engine), "Piegādātāju rēķini")
         tabs.setCurrentIndex(i)
 
     def open_VendorsPayments(self):
         tabs = self.ui.tabWidget
         i = tabs.addTab(VendorsPayments(self.engine), "Piegādātāju maksājumi")
-        tabs.setCurrentIndex(i)
-
-    def open_VendorsCreditnotes(self):
-        tabs = self.ui.tabWidget
-        i = tabs.addTab(VendorsCreditnotes(self.engine), "Piegādātāju kredītrēķini")
         tabs.setCurrentIndex(i)
 
     def open_CashFlowReport(self):

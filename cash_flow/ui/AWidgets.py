@@ -149,7 +149,13 @@ class ATableModel(QAbstractTableModel):
 
     def requery(self):
         self.beginResetModel()
-        self.DATA = self._do_requery()
+
+        df = self._do_requery()
+        if df is not None:
+            self.DATA = df
+        else:
+            self.DATA = pd.DataFrame({})
+
         self.endResetModel()
         # print(self.DATA)
 

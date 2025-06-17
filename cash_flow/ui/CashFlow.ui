@@ -63,30 +63,16 @@
           </widget>
          </item>
          <item>
-          <widget class="QPushButton" name="button_CustomersInvoicesCleared">
+          <widget class="QPushButton" name="button_CustomersInvoices">
            <property name="text">
-            <string>Apmaksātie rēķini</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QPushButton" name="button_CustomersInvoicesUncleared">
-           <property name="text">
-            <string>Neapmaksātie rēķini</string>
+            <string>Klientu rēķini</string>
            </property>
           </widget>
          </item>
          <item>
           <widget class="QPushButton" name="button_CustomersPayments">
            <property name="text">
-            <string>Maksājumi</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QPushButton" name="button_CustomersCreditnotes">
-           <property name="text">
-            <string>Kredītrēķini</string>
+            <string>Klientu maksājumi</string>
            </property>
           </widget>
          </item>
@@ -113,30 +99,16 @@
           </widget>
          </item>
          <item>
-          <widget class="QPushButton" name="button_VendorsInvoicesCleared">
+          <widget class="QPushButton" name="button_VendorsInvoices">
            <property name="text">
-            <string>Apmaksātie rēķini</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QPushButton" name="button_VendorsInvoicesUncleared">
-           <property name="text">
-            <string>Neapmaksātie rēķini</string>
+            <string>Piegādātāju rēķini</string>
            </property>
           </widget>
          </item>
          <item>
           <widget class="QPushButton" name="button_VendorsPayments">
            <property name="text">
-            <string>Maksājumi</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QPushButton" name="button_VendorsCreditnotes">
-           <property name="text">
-            <string>Kredītrēķini</string>
+            <string>Piegādātāju maksājumi</string>
            </property>
           </widget>
          </item>
