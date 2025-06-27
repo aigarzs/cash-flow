@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from cash_flow.database.AEngine import engine
 from cash_flow.database.Model import Account
-
+from cash_flow.util.gui import stylesheet_table_headers
 
 
 # Custom Table Model for Multi-Column ComboBox
@@ -42,12 +42,14 @@ class ComboTableModel(QAbstractTableModel):
 
 # Custom ComboBox with Multi-Column Dropdown
 class ComboAccounts(QComboBox):
-    def __init__(self, engine, parent=None):
+    def __init__(self, engine, parent=None, allow_empty=False):
         super().__init__(parent)
 
         stmt = select(Account.code, Account.name).order_by(Account.code)
         with Session(engine) as session:
-            self.data = session.execute(stmt).fetchall()
+            self.data = [[i for i in rec] for rec in session.execute(stmt).fetchall()]
+            if allow_empty:
+                self.data.insert(0, ["", ""])
 
         # Set up a table view as a popup for multi-column display
         self.table_view = QTableView(self)
@@ -56,6 +58,7 @@ class ComboAccounts(QComboBox):
         self.table_view.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.table_view.verticalHeader().hide()
         self.table_view.horizontalHeader().setStretchLastSection(True)
+        self.table_view.horizontalHeader().setStyleSheet(stylesheet_table_headers())
         self.table_view.setWindowFlags(Qt.WindowType.Popup)
 
         # Model to hold just the first column data, for QComboBox's displayed text

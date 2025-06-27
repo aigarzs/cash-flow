@@ -1,7 +1,7 @@
 from datetime import date, datetime
 
 from PyQt6.QtCore import Qt, QModelIndex
-from PyQt6.QtGui import QBrush
+from PyQt6.QtGui import QBrush, QColor
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QDateEdit, QLabel, QComboBox, QPushButton, QFileDialog, \
     QTabWidget, QCheckBox, QApplication, QStackedWidget
 
@@ -711,12 +711,13 @@ class CashFlowReportModel(ATableModel):
             if role == Qt.ItemDataRole.DisplayRole:
                 value = self.DATA.index[section]
                 return self._format_value(value, role)
-            elif role == Qt.ItemDataRole.BackgroundRole:
-                if self.FORMAT.iloc[section] == 2:  # Totals
-                    return QBrush(Qt.GlobalColor.darkBlue)
-                elif self.FORMAT.iloc[section] == 3: # Balances
-                    return QBrush(Qt.GlobalColor.darkCyan)
-                return None
+            # This works on Linux, but does not work on Windows
+            # elif role == Qt.ItemDataRole.BackgroundRole:
+            #     if self.FORMAT.iloc[section] == 2:  # Totals
+            #         return QBrush(Qt.GlobalColor.darkBlue)
+            #     elif self.FORMAT.iloc[section] == 3: # Balances
+            #         return QBrush(Qt.GlobalColor.darkCyan)
+            #     return None
             return None
         return None
 
@@ -724,10 +725,13 @@ class CashFlowReportModel(ATableModel):
         def_type = self.FORMAT.iloc[index.row()]
         if role == Qt.ItemDataRole.BackgroundRole:
             if def_type == 2: # Totals
-                return QBrush(Qt.GlobalColor.darkBlue)
+                # Good for dark theme
+                # return QBrush(Qt.GlobalColor.darkBlue)
+                return QBrush(QColor("#25a5f5"))
             elif def_type == 3: # Balances
                 return QBrush(Qt.GlobalColor.darkCyan)
             return None
+
         return None
 
 class CheckingReportTable(ATable):

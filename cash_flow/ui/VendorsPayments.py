@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from cash_flow.database.Model import Document, DocType, Vendor
 from cash_flow.ui.AWidgets import ATable, ATableModel
+from cash_flow.ui.ComboDefinition import ComboDefinition
 
 
 class VendorsPayments(QWidget):
@@ -17,9 +18,20 @@ class VendorsPayments(QWidget):
         filterbox = QVBoxLayout()
         filter_line1 = QHBoxLayout()
         filter_line2 = QHBoxLayout()
+        filter_line3 = QHBoxLayout()
 
         label_filter = QLabel("Filtrs")
         label_filter.setStyleSheet("font-weight: bold")
+
+        label_definition = QLabel("NP Nosaukums")
+        self.filter_definition = ComboDefinition(self.engine, allow_empty=True)
+        self.filter_definition.currentIndexChanged.connect(self.requery)
+        definition = pd.read_sql_query(
+            "SELECT id, key, name FROM E01_CashFlowDefinition WHERE definition_type = 1 ORDER BY key",
+            self.engine)
+        self.dict_definition = dict(zip(definition['name'], definition['id']))
+        filter_line1.addWidget(label_definition)
+        filter_line1.addWidget(self.filter_definition)
 
         label_number = QLabel("Numurs")
         self.filter_number = QLineEdit()
@@ -28,10 +40,10 @@ class VendorsPayments(QWidget):
         label_vendor = QLabel("Piegādātājs")
         self.filter_vendor = QLineEdit()
         self.filter_vendor.editingFinished.connect(self.requery)
-        filter_line1.addWidget(label_number)
-        filter_line1.addWidget(self.filter_number)
-        filter_line1.addWidget(label_vendor)
-        filter_line1.addWidget(self.filter_vendor)
+        filter_line2.addWidget(label_number)
+        filter_line2.addWidget(self.filter_number)
+        filter_line2.addWidget(label_vendor)
+        filter_line2.addWidget(self.filter_vendor)
 
         label_date_doc = QLabel("Dokumenta datums")
         self.filter_date_from = QDateEdit()
@@ -44,9 +56,9 @@ class VendorsPayments(QWidget):
         self.filter_date_through.setDisplayFormat("dd.MMMM.yyyy")
         self.filter_date_through.setDate(datetime.now())
         self.filter_date_through.dateChanged.connect(self.requery)
-        filter_line2.addWidget(label_date_doc)
-        filter_line2.addWidget(self.filter_date_from)
-        filter_line2.addWidget(self.filter_date_through)
+        filter_line3.addWidget(label_date_doc)
+        filter_line3.addWidget(self.filter_date_from)
+        filter_line3.addWidget(self.filter_date_through)
 
         label_payments = QLabel("Maksājumi")
         label_payments.setStyleSheet("font-weight: bold")
@@ -66,6 +78,7 @@ class VendorsPayments(QWidget):
         filterbox.addWidget(label_filter)
         filterbox.addLayout(filter_line1)
         filterbox.addLayout(filter_line2)
+        filterbox.addLayout(filter_line3)
 
         vbox.addLayout(filterbox)
         vbox.addWidget(label_payments)
@@ -81,7 +94,8 @@ class VendorsPayments(QWidget):
         self.payment_clearing.model().set_filter({"payment_id": payment_id})
 
     def requery(self):
-        self.table.model().set_filter({"date from": self.filter_date_from.date().toPyDate(),
+        self.table.model().set_filter({"definition_id": self.dict_definition.get(self.filter_definition.currentText()),
+                                       "date from": self.filter_date_from.date().toPyDate(),
                                        "date through": self.filter_date_through.date().toPyDate(),
                                        "vendor": self.filter_vendor.text(),
                                        "number": self.filter_number.text()})
@@ -127,35 +141,76 @@ class PaymentsClearingModel(ATableModel):
 
 class VendorsPaymentsModel(ATableModel):
     def _do_requery(self):
-        stmt = select(Document.id,
-                      DocType.name,
-                      Document.number,
-                      Vendor.name,
-                      Document.date,
-                      Document.amount,
-                      Document.currency) \
-            .join(DocType) \
-            .join(Vendor) \
-            .where(Document.type_id == DocType.BANK_PAYMENT) \
-            .order_by(Document.date, Vendor.name, Document.id)
+        doctype = str(DocType.BANK_PAYMENT)
+        cash_type = "Payment"
 
-        if self.FILTER.get("date from"):
-            stmt = stmt.filter(Document.date >= self.FILTER.get("date from"))
-        if self.FILTER.get("date through"):
-            stmt = stmt.filter(Document.date <= self.FILTER.get("date through"))
-        if self.FILTER.get("number"):
-            stmt = stmt.filter(Document.number == self.FILTER.get("number"))
-        if self.FILTER.get("vendor"):
-            stmt = stmt.filter(Vendor.name.like(f"%{self.FILTER.get('vendor')}%"))
+        # Read database
+        payments = pd.read_sql_query("SELECT * FROM D01_Documents WHERE type_id = " + doctype + "", self.engine)
+        doctypes = pd.read_sql_table("D02_DocTypes", self.engine)
+        vendors = pd.read_sql_query("SELECT id, name FROM B05_Vendors", self.engine)
 
-        with Session(self.engine) as session:
-            dataset = session.execute(stmt).all()
+        # Format columns
+        payments["date"] = pd.to_datetime(payments["date"])
+        payments["date_cleared"] = pd.to_datetime(payments["date_cleared"])
+        payments["cleared"] = payments["cleared"].astype(bool)
 
-            # Convert to DataFrame
-            df = pd.DataFrame(dataset, columns=["id", "Tips", "Numurs", "Piegādātājs",
-                                                       "Datums", "Summa", "Valūta"])
-            df.set_index("id", inplace=True)
+        filter_dfrom = pd.to_datetime(self.FILTER.get("date from"))
+        filter_dthrough = pd.to_datetime(self.FILTER.get("date through"))
 
-        return df
+        payments = payments[(payments["date"] >= filter_dfrom) & (payments["date"] <= filter_dthrough)]
+
+        # Merge doctypes and customer
+        doctypes.rename(columns={"id": "type_id", "name": "type_name"}, inplace=True)
+        vendors.rename(columns={"id": "vendor_id", "name": "vendor_name"}, inplace=True)
+        payments.rename(columns={"id": "document_id"}, inplace=True)
+        payments = pd.merge(payments, doctypes, on="type_id", how="left")
+        payments = pd.merge(payments, vendors, on="vendor_id", how="left")
+
+        filter_vendor = self.FILTER.get("vendor")
+        filter_definition = self.FILTER.get("definition_id")
+        filter_number = self.FILTER.get("number")
+
+        if filter_vendor:
+            payments = payments[payments["vendor_name"].str.contains(filter_vendor, case=False)]
+
+        if filter_number:
+            payments = payments[payments["number"] == filter_number]
+
+        if filter_definition:
+            definition = pd.read_sql_table("E01_CashFlowDefinitionAccounts", self.engine)
+            definition.drop(columns="id", inplace=True)
+            definition = definition[definition["cash_type"] == cash_type]
+            definition = definition[definition["definition_id"] == filter_definition]
+            # print("definition: ", definition)
+
+            gl = pd.read_sql_table("G10_CashFlow_Actual_Corresponding", self.engine)
+            gl = gl[gl["d_id"].isin(payments["document_id"])]
+            # print("gl: ", gl)
+
+            filtered_payments = gl[gl["gl_account"].isin(definition["account"])]["d_id"].unique()
+            # print("filtered_payments: ", filtered_payments)
+
+            payments = payments[payments["document_id"].isin(filtered_payments)]
+            # print("payments: ", payments)
+
+        # Formatting to GUI
+        payments["remaining_amount"] = payments["amount"] - payments["cleared_amount"]
+
+        payments.sort_values(["date", "date_cleared", "document_id"],
+                             ascending=[False, False, False], na_position="first", inplace=True)
+
+        payments = payments.reindex(columns=["document_id", "type_name", "number", "vendor_name",
+                                             "date", "date_cleared",
+                                             "cleared", "description",
+                                             "amount", "currency", "remaining_amount"])
+
+        payments.columns = ["id", "Tips", "Numurs", "Piegādātājs",
+                            "Datums", "Dzēšanas datums",
+                            "Dzēsts", "Apraksts",
+                            "Summa", "Valūta", "Atlikusī summa"]
+
+        payments.set_index("id", inplace=True)
+
+        return payments
 
 

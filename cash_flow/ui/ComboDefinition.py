@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from cash_flow.database.AEngine import engine
 from cash_flow.database.Model import CashFlowDefinition as CFDefinition
-
+from cash_flow.util.gui import stylesheet_table_headers
 
 
 # Custom Table Model for Multi-Column ComboBox
@@ -41,13 +41,15 @@ class ComboTableModel(QAbstractTableModel):
 
 
 # Custom ComboBox with Multi-Column Dropdown
-class ComboStructure(QComboBox):
-    def __init__(self, engine, parent=None):
+class ComboDefinition(QComboBox):
+    def __init__(self, engine, parent=None, allow_empty=False):
         super().__init__(parent)
 
         stmt = select(CFDefinition.key, CFDefinition.name).where(CFDefinition.definition_type==1).order_by(CFDefinition.key)
         with Session(engine) as session:
-            self.data = session.execute(stmt).fetchall()
+            self.data = [[i for i in rec] for rec in session.execute(stmt).fetchall()]
+            if allow_empty:
+                self.data.insert(0, ["", ""])
 
         # Set up a table view as a popup for multi-column display
         self.table_view = QTableView(self)
@@ -57,6 +59,7 @@ class ComboStructure(QComboBox):
         self.table_view.verticalHeader().hide()
         self.table_view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         self.table_view.horizontalHeader().setStretchLastSection(True)
+        self.table_view.horizontalHeader().setStyleSheet(stylesheet_table_headers())
         self.table_view.setWindowFlags(Qt.WindowType.Popup)
 
         # Model to hold just the first column data, for QComboBox's displayed text
@@ -108,7 +111,7 @@ class MainWindow(QWidget):
         layout = QVBoxLayout()
 
         # Add our custom multi-column combo box to the layout
-        self.comboBox = ComboStructure(engine, self)
+        self.comboBox = ComboDefinition(engine, self)
         layout.addWidget(self.comboBox)
 
         self.setLayout(layout)

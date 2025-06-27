@@ -6,12 +6,14 @@ import pandas.api.types as ptypes
 
 import numpy as np
 from PyQt6.QtCore import QAbstractTableModel, Qt, QModelIndex
-from PyQt6.QtGui import QBrush
+from PyQt6.QtGui import QBrush, QColor
 from PyQt6.QtWidgets import QTableView, QHeaderView, QMenu
 from sqlalchemy.orm import Session
 from sqlalchemy.engine import Engine
 from cash_flow.util.Converters import decimal_format, date_format, str_to_date, pandas_to_python
 import pandas as pd
+
+from cash_flow.util.gui import stylesheet_table_headers
 
 
 class ATableModel:
@@ -24,6 +26,11 @@ class ATable(QTableView):
         super().__init__(parent)
         self.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         # self.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+
+        # This header formatting is required on Windows. On Linux model().headerData() works fine
+        self.horizontalHeader().setStyleSheet(stylesheet_table_headers())
+        self.verticalHeader().setStyleSheet(stylesheet_table_headers())
+
         self.context_menu = QMenu()
         action_requery = self.context_menu.addAction("Pārrēķināt")
         action_requery.triggered.connect(self.action_requery)
@@ -150,7 +157,12 @@ class ATableModel(QAbstractTableModel):
     def requery(self):
         self.beginResetModel()
 
-        df = self._do_requery()
+        try:
+            df = self._do_requery()
+        except Exception as err:
+            print("Requery error: ", err)
+            df = None
+
         if df is not None:
             self.DATA = df
         else:
@@ -175,6 +187,8 @@ class ATableModel(QAbstractTableModel):
                     return str(self.DATA.index[section])
             except IndexError as err:
                 return None
+
+
         return None
 
     def data(self, index, role=Qt.ItemDataRole.DisplayRole):
@@ -227,6 +241,8 @@ class ATableModel(QAbstractTableModel):
             else:
                 return int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
 
+        return None
+
     def _format_background(self, index, role=Qt.ItemDataRole.BackgroundRole):
         """
         This formats cell background.
@@ -242,7 +258,12 @@ class ATableModel(QAbstractTableModel):
         if role == Qt.ItemDataRole.BackgroundRole:
             if Qt.ItemFlag.ItemIsEditable in flags \
                     or Qt.ItemFlag.ItemIsUserCheckable in flags:
-                return QBrush(Qt.GlobalColor.color1)
+                # This is very dark color, good for dark theme
+                # return QBrush(Qt.GlobalColor.color1)
+                # This is light color, good for light theme
+                return QBrush(QColor("#edf4f7"))
+
+        return None
 
     def flags(self, index):
         """

@@ -306,8 +306,8 @@ class VendorsInvoicesModel(ATableModel):
 
     def _do_requery(self):
 
-        # Customer Invoices and Creditnotes
-        doctypes = str((DocType.INVOICE_VENDOR, DocType.CREDITNOTE_VENDOR))
+        # Vendor Invoices and Creditnotes
+        doctypes = str((DocType.INVOICE_VENDOR, DocType.CREDITNOTE_VENDOR, DocType.PAYROLL))
         cash_type = "Payment"
 
         #Read database

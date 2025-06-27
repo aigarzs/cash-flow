@@ -11,7 +11,6 @@ from cash_flow.ui.CashFlowDefinition import CashFlowDefinition
 from cash_flow.ui.Customers import Customers
 from cash_flow.ui.CustomersInvoices import CustomersInvoices
 from cash_flow.ui.CustomersPayments import CustomersPayments
-from cash_flow.ui.Demo import Demo
 from cash_flow.ui.Vendors import Vendors
 from cash_flow.ui.VendorsInvoices import VendorsInvoices
 from cash_flow.ui.VendorsPayments import VendorsPayments

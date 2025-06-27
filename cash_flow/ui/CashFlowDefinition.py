@@ -11,7 +11,7 @@ from cash_flow.database.Model import CashFlowDefinitionAccount as CFAccount
 from cash_flow.database.Model import CashFlowDefinitionTotal as CFTotal
 from cash_flow.ui.AWidgets import ATable, ATableModel
 from cash_flow.ui.ComboAccounts import ComboAccounts
-from cash_flow.ui.ComboStructure import ComboStructure
+from cash_flow.ui.ComboDefinition import ComboDefinition
 from cash_flow.util.Converters import various_to_integer
 
 
@@ -77,7 +77,7 @@ class StructureDelegate(QStyledItemDelegate):
         self.engine = engine
 
     def createEditor(self, parent, option, index):
-        combo = ComboStructure(self.engine, parent)
+        combo = ComboDefinition(self.engine, parent)
         return combo
 
     def updateEditorGeometry(self, editor, option, index):
