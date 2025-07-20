@@ -2,8 +2,6 @@ from sqlalchemy import Integer, String, DateTime, Numeric, ForeignKey, event, \
     text, Boolean, Float
 from sqlalchemy.orm import DeclarativeBase, mapped_column, relationship
 
-from cash_flow.database.Views import views_all
-
 
 class Base(DeclarativeBase):
     pass
@@ -45,6 +43,7 @@ class Source(Base):
     type_id = mapped_column(ForeignKey("A03_SourceTypes.id", ondelete="CASCADE"))
     name = mapped_column(String(100), nullable=False)
     url = mapped_column(String(255), nullable=False)
+    database = mapped_column(String(100), nullable=False)
     username = mapped_column(String(100))
     password = mapped_column(String(255))
 
@@ -396,7 +395,3 @@ class Jumis_Partner(Base):
 
 
 
-
-@event.listens_for(BudgetEntry.metadata, "after_create")
-def create_views(target, connection, **kw):
-    views_all(connection)

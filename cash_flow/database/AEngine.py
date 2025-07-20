@@ -1,17 +1,24 @@
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
+from sqlalchemy.orm import Session
+
+from cash_flow.database.Model import Source
 from cash_flow.util.Settings import engine_echo
 
 engine_db = create_engine("sqlite:///../../data/database.db", echo=engine_echo)
 
-username = "genie@inbox.lv"
-password = "fisJMLfHsto7q-C!^7(J[5G7VHfTj7"
-server = "jumiscloud.mansjumis.lv,12878"  # Use double backslashes for instance names
-database = "alfreds"
+with Session(engine_db) as session:
+    stmt = select(Source).where(Source.id == 2)
+    jumis = session.scalars(stmt).first()
 
-connection_string = (
-    f"mssql+pyodbc://{username}:{password}@{server}/{database}"
-    "?driver=ODBC+Driver+17+for+SQL+Server"
-)
+    username = jumis.username
+    password = jumis.password
+    url = jumis.url
+    database = jumis.database
 
-engine_jumis = create_engine(connection_string)
+    connection_string = (
+        f"mssql+pyodbc://{username}:{password}@{url}/{database}"
+        "?driver=ODBC+Driver+17+for+SQL+Server"
+    )
+
+    engine_jumis = create_engine(connection_string, echo=engine_echo)
 
