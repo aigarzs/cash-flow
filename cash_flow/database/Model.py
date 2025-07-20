@@ -241,8 +241,8 @@ class Reconciliation(Base):
     amount = mapped_column(Numeric(12,2), nullable=False)
     currency = mapped_column(ForeignKey("B01_Currencies.code"), nullable=False)
     date = mapped_column(DateTime, nullable=False)
-    invoice_id = mapped_column(ForeignKey("D01_Documents.id"), nullable=False)
-    payment_id = mapped_column(ForeignKey("D01_Documents.id"), nullable=False)
+    cr_id = mapped_column(ForeignKey("D01_Documents.id"), nullable=False)
+    dr_id = mapped_column(ForeignKey("D01_Documents.id"), nullable=False)
     source_id = mapped_column(ForeignKey("A02_Sources.id", ondelete="CASCADE"),
                               nullable=False)
     source_key = mapped_column(String(30), nullable=False)
@@ -376,6 +376,26 @@ class BudgetEntry(Base):
     date = mapped_column(DateTime, nullable=True, index=True)
     amount_LC = mapped_column(Numeric(12, 2, 2), nullable=True)
     memo = mapped_column(String(250), nullable=True)
+
+class Jumis_Account(Base):
+    __tablename__ = "Jumis_Account"
+    AccountID = mapped_column(Integer, primary_key=True)
+    AccountCode = mapped_column(String(21), nullable=True, index=True)
+    AccountName = mapped_column(String(50), nullable=True)
+    CreateDate = mapped_column(DateTime, nullable=True, index=True)
+    UpdateDate = mapped_column(DateTime, nullable=True, index=True)
+    rn = mapped_column(Integer)
+
+class Jumis_Partner(Base):
+    __tablename__ = "Jumis_Partner"
+    PartnerID = mapped_column(Integer, primary_key=True)
+    PartnerName = mapped_column(String(255), nullable=False)
+    CreateDate = mapped_column(DateTime, nullable=True, index=True)
+    UpdateDate = mapped_column(DateTime, nullable=True, index=True)
+    rn = mapped_column(Integer)
+
+
+
 
 @event.listens_for(BudgetEntry.metadata, "after_create")
 def create_views(target, connection, **kw):

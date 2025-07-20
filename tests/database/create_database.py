@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from faker import Faker
 from sqlalchemy.orm import Session
 
-from cash_flow.database.AEngine import engine
+from cash_flow.database.AEngine import engine_db as engine
 from cash_flow.database.Model import Base, AccountType, Account, \
     Source, Currency, Customer, Vendor, Document, DocType, GeneralLedger
 from cash_flow.gl.clearing import clear_auto_all_customers, clear_auto_all_vendors
@@ -303,5 +303,5 @@ def test_create_documents_data():
 test_create_database()
 test_create_dimensions_data()
 test_create_documents_data()
-clear_auto_all_customers()
-clear_auto_all_vendors()
+# clear_auto_all_customers()
+# clear_auto_all_vendors()
