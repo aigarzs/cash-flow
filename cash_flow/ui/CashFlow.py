@@ -4,7 +4,7 @@ from PyQt6 import uic
 from PyQt6.QtWidgets import QApplication
 
 import cash_flow.util.Settings
-from cash_flow.database.AEngine import engine
+from cash_flow.database.AEngine import create_engine_db
 from cash_flow.ui.Budget import Budget
 from cash_flow.ui.CashFlowReport import CashFlowReport
 from cash_flow.ui.CashFlowDefinition import CashFlowDefinition
@@ -20,7 +20,7 @@ class CashFlow(QApplication):
     def __init__(self, argv):
         super().__init__(argv)
         self.ui = uic.loadUi("CashFlow.ui")
-        self.engine = engine
+        self.engine = create_engine_db()
         self.setup_ui()
         self.setup_translations()
         self.ui.show()

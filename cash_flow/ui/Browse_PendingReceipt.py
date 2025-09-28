@@ -84,9 +84,6 @@ class PendingReceiptModel(ATableModel):
         transactions = pd.read_sql_query("SELECT * FROM G12_CashFlow_Pending_Corresponding WHERE p_date > '" + previous_day_date_from +
                                          "' AND p_date < '" + next_day_date_through + "'", self.engine)
         definition = pd.read_sql_table("E01_CashFlowDefinitionAccounts", self.engine)
-        customers = pd.read_sql_table("B04_Customers", self.engine)
-        vendors = pd.read_sql_table("B05_Vendors", self.engine)
-        doctypes = pd.read_sql_table("D02_DocTypes", self.engine)
         cash_types = pd.DataFrame({"cf_type": ["Receipt", "Payment"], "cf_type_translated": ["Ieņēmums", "Maksājums"]})
         cash_statuses = pd.DataFrame({"cf_status": ["Actual", "Pending", "Budgeted"],
                                       "cf_status_translated": ["Faktiski", "Sagaidāmi", "Budžets"]})
@@ -95,21 +92,18 @@ class PendingReceiptModel(ATableModel):
         definition = definition[definition["definition_id"] == definition_id]
         definition = definition.drop(columns = ["id"])
         # print(definition)
-        transactions = definition.merge(transactions, left_on = ["cash_type", "account"], right_on = ["cash_type", "gl_account"], how="left")
+        transactions = definition.merge(transactions, left_on = ["cash_type", "account"], right_on = ["cash_type", "account"], how="left")
         transactions["p_date"] = pd.to_datetime(transactions['p_date'], format='mixed', errors='coerce')
         transactions["period_end"] = transactions["p_date"].apply(lambda d: date_offset.rollforward(d) if pd.notnull(d) else pd.NaT)
-        transactions = transactions.merge(customers[["id", "name"]], left_on = "d_customer_id", right_on = "id", how = "left")
-        transactions = transactions.merge(vendors[["id", "name"]], left_on = "d_vendor_id", right_on = "id", how = "left")
-        transactions = transactions.merge(doctypes, left_on = "d_type", right_on = "id", how = "left")
         transactions = transactions.merge(cash_types, left_on = "cash_type", right_on = "cf_type", how = "left")
         transactions = transactions.merge(cash_statuses, left_on = "cash_status", right_on = "cf_status", how = "left")
         transactions = transactions[transactions["period_end"] == period_end]
         transactions = transactions[transactions["cash_type"] == "Receipt"]
-        transactions = transactions.reindex(columns=["d_id", "period_end", "cf_type_translated", "cf_status_translated", "name", "p_date", "d_number",
-                                                     "name_x", "name_y", "d_description", "gl_entry_type", "gl_account",
-                                                     "d_currency", "gl_amount", "gl_amount_LC"])
+        transactions = transactions.reindex(columns=["d_id", "period_end", "cf_type_translated", "cf_status_translated", "d_type", "p_date", "number",
+                                                     "partner_name", "description", "entry_type", "account",
+                                                     "currency", "p_amount", "p_amount_LC"])
         transactions.columns = ["d_id", "Periods", "NP Tips", "NP Statuss", "Dok. Tips", "Datums", "Dok. Numurs",
-                                "Klients", "Piegādātājs", "Dok. Apraksts", "VG Tips", "VG Konts",
+                                "Partneris", "Dok. Apraksts", "VG Tips", "VG Konts",
                                 "Valūta", "Summa", "Summa BV"]
         transactions = transactions.set_index("d_id")
 

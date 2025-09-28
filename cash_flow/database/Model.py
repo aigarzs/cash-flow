@@ -1,5 +1,5 @@
 from sqlalchemy import Integer, String, DateTime, Numeric, ForeignKey, event, \
-    text, Boolean, Float
+    text, Boolean, Float, UniqueConstraint, PrimaryKeyConstraint, BigInteger
 from sqlalchemy.orm import DeclarativeBase, mapped_column, relationship
 
 
@@ -38,35 +38,37 @@ def default_data_sources(target, connection, **kw):
 class Source(Base):
     __tablename__ = "A02_Sources"
     GENIE = 1
-    DEFAULT = 2
+    TILDES_JUMIS = 2
     id = mapped_column(Integer, primary_key=True)
     type_id = mapped_column(ForeignKey("A03_SourceTypes.id", ondelete="CASCADE"))
     name = mapped_column(String(100), nullable=False)
     url = mapped_column(String(255), nullable=False)
-    database = mapped_column(String(100), nullable=False)
-    username = mapped_column(String(100))
-    password = mapped_column(String(255))
+    database = mapped_column(String(100), nullable=True)
+    username = mapped_column(String(100), nullable=True)
+    password = mapped_column(String(255), nullable=True)
 
 
 @event.listens_for(Source.metadata, "after_create")
 def default_data_sources(target, connection, **kw):
     table_name = Source.__tablename__
     sql = ("INSERT INTO " + table_name +
-           " (id, type_id, name, url, username, password) " +
-           " VALUES (:id, :type, :name, :url, :username, :password)")
+           " (id, type_id, name, url, database, username, password) " +
+           " VALUES (:id, :type, :name, :url, :database, :username, :password)")
     params = [{ "id": Source.GENIE,
                 "type": SourceType.GENIE,
                 "name": "Genie Cash Flow App",
                 "url": "localhost",
+                "database": None,
                 "username": "user",
                 "password": "password"
                 },
-                {"id": Source.DEFAULT,
+                {"id": Source.TILDES_JUMIS,
                "type": SourceType.TILDES_JUMIS,
                "name": "Tildes Jumis galvenā db",
-               "url": "localhost:5210//jumis",
-               "username": "user",
-               "password": "password"},
+               "url": "jumiscloud.mansjumis.lv,12878",
+               "database": "alfreds",
+               "username": "genie@inbox.lv",
+               "password": "fisJMLfHsto7q-C!^7(J[5G7VHfTj7"},
               ]
 
     connection.execute(text(sql), params)
@@ -107,11 +109,8 @@ class AccountType(Base):
     __tablename__ = "B03_AccountTypes"
 
     BANK_ACCOUNT = 1
-    CUSTOMERS_ACCOUNT = 2
-    VENDORS_ACCOUNT = 3
-    EXPENSES_ACCOUNT = 4
-    REVENUES_ACCOUNT = 5
-    TAX_ACCOUNT = 6
+    SETTLEMENT_ACCOUNT = 2
+
 
     id = mapped_column(Integer, primary_key=True)
     name = mapped_column(String(100), nullable=False)
@@ -122,63 +121,35 @@ def default_data_account_types(target, connection, **kw):
     sql = "INSERT INTO " + table_name + " (id, name) VALUES (:id, :name)"
     params = [{"id": AccountType.BANK_ACCOUNT,
                "name": "Naudas līdzekļu konts"},
-              {"id": AccountType.CUSTOMERS_ACCOUNT,
-               "name": "Norēķini ar klientiem"},
-              {"id": AccountType.VENDORS_ACCOUNT,
-               "name": "Norēķini ar piegādātājiem"},
-              {"id": AccountType.EXPENSES_ACCOUNT,
-               "name": "Naudas izlietojuma konts"},
-              {"id": AccountType.REVENUES_ACCOUNT,
-               "name": "Naudas ieņēmumu konts"},
-              {"id": AccountType.TAX_ACCOUNT,
-               "name": "PVN konts"},
+              {"id": AccountType.SETTLEMENT_ACCOUNT,
+               "name": "Norēķini ar partneriem"},
               ]
 
     connection.execute(text(sql), params)
 
 
-
-class Customer(Base):
-    __tablename__ = "B04_Customers"
+class Partner(Base):
+    __tablename__ = "B04_Partners"
     id = mapped_column(Integer, primary_key=True)
     name = mapped_column(String(100), nullable=False)
-    source_id = mapped_column(ForeignKey("A02_Sources.id", ondelete="CASCADE"))
-    source_key = mapped_column(String(30))
-    priority = mapped_column(Integer, nullable=False)
-    void = mapped_column(Boolean, nullable=False, default=False)
-
-class Vendor(Base):
-    __tablename__ = "B05_Vendors"
-    id = mapped_column(Integer, primary_key=True)
-    name = mapped_column(String(100), nullable=False)
-    source_id = mapped_column(ForeignKey("A02_Sources.id", ondelete="CASCADE"))
-    source_key = mapped_column(String(30))
-    priority = mapped_column(Integer, nullable=False)
-    void = mapped_column(Boolean, nullable=False, default=False)
+    cr_priority = mapped_column(Integer, nullable=False, default=100)
+    cr_void = mapped_column(Boolean, nullable=False, default=False)
+    dr_priority = mapped_column(Integer, nullable=False, default=100)
+    dr_void = mapped_column(Boolean, nullable=False, default=False)
 
 class Document(Base):
     __tablename__ = "D01_Documents"
 
     id = mapped_column(Integer, primary_key=True)
-    source_id = mapped_column(ForeignKey("A02_Sources.id", ondelete="CASCADE"), nullable=False)
-    source_key = mapped_column(String(30), nullable=False)
     type_id = mapped_column(ForeignKey("D02_DocTypes.id"))
+    number = mapped_column(String(30), nullable=True)
     date = mapped_column(DateTime, nullable=False, index=True)
-    date_due = mapped_column(DateTime, nullable=False)
-    date_planned_clearing = mapped_column(DateTime, nullable=False, index=True)
-    date_cleared = mapped_column(DateTime, nullable=True)
-    priority = mapped_column(Integer, nullable=False)
-    number = mapped_column(String(30), nullable=False)
-    customer_id = mapped_column(ForeignKey("B04_Customers.id"), nullable=True)
-    vendor_id = mapped_column(ForeignKey("B05_Vendors.id"), nullable=True)
-    description = mapped_column(String(255), nullable=False)
-    amount = mapped_column(Numeric(12,2, 2), nullable=False)
-    currency  = mapped_column(ForeignKey("B01_Currencies.code"), nullable=False)
+    date_due = mapped_column(DateTime, nullable=True, index=True)
+    partner_id = mapped_column(ForeignKey("B04_Partners.id"), nullable=False)
+    description = mapped_column(String(255), nullable=True)
+    currency = mapped_column(ForeignKey("B01_Currencies.code"), nullable=False, index=True)
+    amount = mapped_column(Numeric(12, 2, 2), nullable=False)
     amount_LC = mapped_column(Numeric(12, 2, 2), nullable=False)
-    memo = mapped_column(String)
-    cleared = mapped_column(Boolean, nullable=False, default=0)
-    cleared_amount = mapped_column(Numeric(12, 2), nullable=False, default=0)
-    void = mapped_column(Boolean, nullable=False, default=0)
     gl = relationship("GeneralLedger", back_populates="document")
 
     def __repr__(self):
@@ -192,59 +163,62 @@ class Document(Base):
 
 class DocType(Base):
     __tablename__ = "D02_DocTypes"
-    BANK_RECEIPT = 1
-    BANK_PAYMENT = 2
-    INVOICE_CUSTOMER = 3
-    INVOICE_VENDOR = 4
-    CREDITNOTE_CUSTOMER = 5
-    CREDITNOTE_VENDOR = 6
-    PAYROLL = 7
+    BANK_RECEIPT = 14
+    BANK_PAYMENT = 13
+    INVOICE_CUSTOMER = 104
+    INVOICE_VENDOR = 103
+    GL_TRANSACTIONS = 6
     id = mapped_column(Integer, primary_key=True)
     name = mapped_column(String(100))
 
-@event.listens_for(DocType.metadata, "after_create")
-def default_data_doc_types(target, connection, **kw):
-    table_name = DocType.__tablename__
-    sql = "INSERT INTO " + table_name + " (id, name) VALUES (:id, :name)"
-    params = [{"id": DocType.BANK_RECEIPT,
-               "name": "Ienākošais bankas maksājums"},
-              {"id": DocType.BANK_PAYMENT,
-               "name": "Izejošais bankas maksājums"},
-              {"id": DocType.INVOICE_CUSTOMER,
-                "name": "Rēķins klientam"},
-              {"id": DocType.INVOICE_VENDOR,
-               "name": "Rēķins no piegādātāja"},
-              {"id": DocType.CREDITNOTE_CUSTOMER,
-               "name": "Kredītrēķins klientam"},
-              {"id": DocType.CREDITNOTE_VENDOR,
-               "name": "Kredītrēķins no piegādātāja"},
-              {"id": DocType.PAYROLL,
-               "name": "Algu saraksts"},
-              ]
 
-    connection.execute(text(sql), params)
 
 class GeneralLedger(Base):
     __tablename__ = "D03_GeneralLedger"
     id = mapped_column(Integer, primary_key=True)
     document_id = mapped_column(ForeignKey("D01_Documents.id", ondelete="CASCADE"), nullable=False)
+    date = mapped_column(DateTime, nullable=False, index=True)
+    date_due = mapped_column(DateTime, nullable=True, index=True)
+    partner_id = mapped_column(ForeignKey("B04_Partners.id"), nullable=False, index=True)
     entry_type = mapped_column(String(2), nullable=False, index=True)
     account = mapped_column(ForeignKey("B02_Accounts.code"), nullable=False, index=True)
+    currency =mapped_column(ForeignKey("B01_Currencies.code"), nullable=False, index=True)
     amount = mapped_column(Numeric(12,2, 2), nullable=False)
     amount_LC = mapped_column(Numeric(12,2, 2), nullable=False)
+    cleared = mapped_column(Boolean, nullable=False, server_default=text("0"))
+    cleared_amount = mapped_column(Numeric(12, 2), nullable=False, server_default=text("0"))
+    date_cleared = mapped_column(DateTime, nullable=True, index=True)
     document = relationship("Document", back_populates="gl")
+
+    __table_args__ = (UniqueConstraint("document_id", "partner_id", "account", "currency"),)
+
+
+
+class GeneralLedger_preserved(Base):
+    __tablename__ = "D03_GeneralLedger_preserved"
+    id = mapped_column(Integer, primary_key=True)
+    document_id = mapped_column(ForeignKey("D01_Documents.id"), nullable=False)
+    date_planned_clearing = mapped_column(DateTime, nullable=True, index=True)
+    partner_id = mapped_column(ForeignKey("B04_Partners.id"), nullable=False, index=True)
+    account = mapped_column(ForeignKey("B02_Accounts.code"), nullable=False, index=True)
+    currency = mapped_column(ForeignKey("B01_Currencies.code"), nullable=False, index=True)
+    memo = mapped_column(String)
+    void = mapped_column(Boolean, nullable=False, server_default=text("0"))
+    priority = mapped_column(Integer, nullable=False, server_default=text("100"))
+
+    __table_args__ = (UniqueConstraint("document_id", "partner_id", "account", "currency"),)
+
 
 class Reconciliation(Base):
     __tablename__ = "D04_Reconciliations"
     id = mapped_column(Integer, primary_key=True)
-    amount = mapped_column(Numeric(12,2), nullable=False)
-    currency = mapped_column(ForeignKey("B01_Currencies.code"), nullable=False)
     date = mapped_column(DateTime, nullable=False)
-    cr_id = mapped_column(ForeignKey("D01_Documents.id"), nullable=False)
-    dr_id = mapped_column(ForeignKey("D01_Documents.id"), nullable=False)
-    source_id = mapped_column(ForeignKey("A02_Sources.id", ondelete="CASCADE"),
-                              nullable=False)
-    source_key = mapped_column(String(30), nullable=False)
+    account = mapped_column(ForeignKey("B02_Accounts.code"), nullable=False, index=True)
+    currency = mapped_column(ForeignKey("B01_Currencies.code"), nullable=False, index=True)
+    amount = mapped_column(Numeric(12,2), nullable=False)
+    cr_docid = mapped_column(ForeignKey("D01_Documents.id", ondelete="CASCADE"), nullable=False)
+    dr_docid = mapped_column(ForeignKey("D01_Documents.id", ondelete="CASCADE"), nullable=False)
+
 
 class CashFlowDefinition(Base):
     __tablename__ = "E01_CashFlowDefinition"
@@ -389,8 +363,74 @@ class Jumis_Partner(Base):
     __tablename__ = "Jumis_Partner"
     PartnerID = mapped_column(Integer, primary_key=True)
     PartnerName = mapped_column(String(255), nullable=False)
+    PhysicalPersonFirstName = mapped_column(String(255), nullable=True)
     CreateDate = mapped_column(DateTime, nullable=True, index=True)
     UpdateDate = mapped_column(DateTime, nullable=True, index=True)
+    rn = mapped_column(Integer)
+
+class Jumis_Currency(Base):
+    __tablename__ = "Jumis_Currency"
+    CurrencyID = mapped_column(Integer, primary_key=True)
+    CurrencyCode = mapped_column(String(21), nullable=False, index=True)
+    Description = mapped_column(String(255), nullable=True)
+    rn = mapped_column(Integer)
+
+class Jumis_CurrencyRates(Base):
+    __tablename__ = "Jumis_CurrencyRates"
+    RateID = mapped_column(Integer, primary_key=True)
+    CurrencyID = mapped_column(ForeignKey("Jumis_Currency.CurrencyID"), nullable=False)
+    RateDate = mapped_column(DateTime, nullable=False, index=True)
+    Rate = mapped_column(Numeric(15, 10, 10), nullable=True)
+    rn = mapped_column(Integer)
+
+class Jumis_DocumentType(Base):
+    __tablename__ = "Jumis_DocumentType"
+    DocumentTypeID = mapped_column(Integer, primary_key=True)
+    TypeName = mapped_column(String(255), nullable=True)
+    TypeShortName = mapped_column(String(255), nullable=True)
+    rn = mapped_column(Integer)
+
+class Jumis_FinancialDoc(Base):
+    __tablename__ = "Jumis_FinancialDoc"
+    FinancialDocID = mapped_column(Integer, primary_key=True)
+    FinancialDocNo = mapped_column(String(50), nullable=True)
+    DocumentTypeID = mapped_column(Integer, nullable=False, index=True)
+    FinancialDocDate = mapped_column(DateTime, nullable=False, index=True)
+    DocStatus = mapped_column(Integer, nullable=False, index=True)
+    DocCurrencyID = mapped_column(Integer, nullable=False, index=True)
+    DocAmount = mapped_column(Numeric(12, 2, 2), nullable=True)
+    PartnerID = mapped_column(Integer, nullable=False, index=True)
+    DisbursementTerm = mapped_column(DateTime, nullable=True, index=True)
+    Disbursement = mapped_column(Integer, nullable=True, index=True)
+    DisbursementDate = mapped_column(DateTime, nullable=True, index=True)
+    Comments = mapped_column(String(255), nullable=True)
+    DocRegDate = mapped_column(DateTime, nullable=True, index=True)
+    CreateDate = mapped_column(DateTime, nullable=True, index=True)
+    UpdateDate = mapped_column(DateTime, nullable=True, index=True)
+    rn = mapped_column(Integer)
+
+class Jumis_FinancialDocLine(Base):
+    __tablename__ = "Jumis_FinancialDocLine"
+    FinancialDocLineID = mapped_column(Integer, primary_key=True)
+    FinancialDocID = mapped_column(ForeignKey("Jumis_FinancialDoc"), nullable=False)
+    LineDate = mapped_column(DateTime, nullable=False, index=True)
+    CurrencyID = mapped_column(Integer, nullable=False, index=True)
+    Amount = mapped_column(Numeric(12, 2, 2), nullable=True)
+    DebetID = mapped_column(Integer, nullable=False, index=True)
+    CreditID = mapped_column(Integer, nullable=False, index=True)
+    Comments = mapped_column(String(255), nullable=True)
+    DisbursementDocID = mapped_column(Integer, nullable=True, index=True)
+    UpdateDate = mapped_column(DateTime, nullable=True, index=True)
+    CreateDate = mapped_column(DateTime, nullable=True, index=True)
+    rn = mapped_column(Integer)
+
+class Jumis_FinancialDocDisbursement(Base):
+    __tablename__ = "Jumis_FinancialDocDisbursement"
+    FinancialDocDisbursementID = mapped_column(Integer, primary_key=True)
+    DebetDocID = mapped_column(Integer, nullable=False, index=True)
+    CreditDocID = mapped_column(Integer, nullable=False, index=True)
+    DebetAmount = mapped_column(Numeric(12, 2, 2), nullable=True)
+    CreditAmount = mapped_column(Numeric(12, 2, 2), nullable=True)
     rn = mapped_column(Integer)
 
 

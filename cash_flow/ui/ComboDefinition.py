@@ -8,7 +8,7 @@ from PyQt6.QtCore import Qt, QAbstractTableModel, QStringListModel, QModelIndex,
 from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
 
-from cash_flow.database.AEngine import engine
+from cash_flow.database.AEngine import create_engine_db
 from cash_flow.database.Model import CashFlowDefinition as CFDefinition
 from cash_flow.util.gui import stylesheet_table_headers
 
@@ -111,7 +111,7 @@ class MainWindow(QWidget):
         layout = QVBoxLayout()
 
         # Add our custom multi-column combo box to the layout
-        self.comboBox = ComboDefinition(engine, self)
+        self.comboBox = ComboDefinition(create_engine_db(), self)
         layout.addWidget(self.comboBox)
 
         self.setLayout(layout)

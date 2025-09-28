@@ -199,7 +199,7 @@ class CashFlowReport(QWidget):
                                            "Date_Through": self.filter_dateThrough.date().toPyDate(),
                                            "Period_End": self.checkreport.model().DATA.iloc[index.row(), 0],
                                            "Definition_ID": self.checkreport.model().DATA.iloc[index.row(), 1],
-                                           "Frequency": self.filter_Frequency.currentText()})
+                                           "Frequency": self.freq_map.get(self.filter_Frequency.currentText(), "month")})
             self.checkreport_stacked.setCurrentWidget(form)
 
 
@@ -373,6 +373,7 @@ class CashFlowReport(QWidget):
 class CashFlowReportModel(ATableModel):
 
     def _do_requery(self):
+        engine = self.engine
 
         # Setup filters
         date_from = self.FILTER["date from"].strftime("%Y-%m-%d")
@@ -404,35 +405,34 @@ class CashFlowReportModel(ATableModel):
         previous_day_date_from = (pd.to_datetime(date_from) - pd.Timedelta(days=1)).strftime('%Y-%m-%d')
 
         actual = pd.read_sql_query(
-            'SELECT * FROM G10_CashFlow_Actual_Corresponding WHERE d_date < "' + next_day_date_through + '" ', self.engine)
+            'SELECT * FROM G09_CashFlow_Actual_Corresponding WHERE date < "' + next_day_date_through + '" ', engine)
         pending = pd.read_sql_query(
-            'SELECT * FROM G12_CashFlow_Pending_Corresponding WHERE p_date < "' + next_day_date_through + '" ', self.engine)
+            'SELECT * FROM G12_CashFlow_Pending_Corresponding WHERE p_date < "' + next_day_date_through + '" ', engine)
         budgeted = pd.read_sql_query(
             'SELECT * FROM F01_BudgetEntries WHERE date > "' + previous_day_date_from + '" AND date < "' + next_day_date_through + '" ',
-            self.engine)
-        cash = pd.read_sql_query('SELECT * FROM G02_CashTransactions WHERE d_date < "' + next_day_date_through + '" ',
-                                 self.engine)
-        definition_df = pd.read_sql_table("E01_CashFlowDefinition", self.engine)
+            engine)
+        cash = pd.read_sql_query('SELECT * FROM G01_CashTransactions WHERE date < "' + next_day_date_through + '" ',
+                                 engine)
+        definition_df = pd.read_sql_table("E01_CashFlowDefinition", engine)
 
-        definition_accounts_df = pd.read_sql_table("E01_CashFlowDefinitionAccounts", self.engine)
-        definition_totals_df = pd.read_sql_table("E01_CashFlowDefinitionTotals", self.engine)
+        definition_accounts_df = pd.read_sql_table("E01_CashFlowDefinitionAccounts", engine)
+        definition_totals_df = pd.read_sql_table("E01_CashFlowDefinitionTotals", engine)
 
         # Ensure required columns and formats
 
-        actual['period_end'] = pd.to_datetime(actual['d_date'], format='mixed', errors='coerce').apply(
+        actual['period_end'] = pd.to_datetime(actual['date'], format='mixed', errors='coerce').apply(
             lambda d: date_offset.rollforward(d) if pd.notnull(d) else pd.NaT)
-        actual['cf_amount'] = np.where(actual['gl_entry_type'] == 'CR', actual['gl_amount_LC'], -actual['gl_amount_LC'])
+        actual['cf_amount'] = np.where(actual['entry_type'] == 'CR', actual['amount_LC'], -actual['amount_LC'])
         pending['period_end'] = pd.to_datetime(pending['p_date'], format='mixed', errors='coerce').apply(
             lambda d: date_offset.rollforward(d) if pd.notnull(d) else pd.NaT)
-        pending['cf_amount'] = np.where(pending['gl_entry_type'] == 'CR', pending['gl_amount_LC'],
-                                        -pending['gl_amount_LC'])
+        pending['cf_amount'] = np.where(pending['entry_type'] == 'CR', pending['p_amount_LC'], -pending['p_amount_LC'])
         budgeted['period_end'] = pd.to_datetime(budgeted['date'], format='mixed', errors='coerce').apply(
             lambda d: date_offset.rollforward(d) if pd.notnull(d) else pd.NaT)
         budgeted['cf_amount'] = np.where(budgeted['cash_type'] == 'Receipt', budgeted['amount_LC'],
                                          -budgeted['amount_LC'])
-        cash['period_end'] = pd.to_datetime(cash['d_date'], format='mixed', errors='coerce').apply(
+        cash['period_end'] = pd.to_datetime(cash['date'], format='mixed', errors='coerce').apply(
             lambda d: date_offset.rollforward(d) if pd.notnull(d) else pd.NaT)
-        cash['cf_amount'] = np.where(cash['gl_entry_type'] == 'DR', cash['gl_amount_LC'], -cash['gl_amount_LC'])
+        cash['cf_amount'] = np.where(cash['entry_type'] == 'DR', cash['amount_LC'], -cash['amount_LC'])
 
         definition_df.rename(columns={"id": "definition_id"}, inplace=True)
         definition_acc_df = definition_df[definition_df["definition_type"] == 1]
@@ -455,14 +455,14 @@ class CashFlowReportModel(ATableModel):
         actual = pd.merge(definition_accounts_df,
                           actual,
                           left_on=['cash_type', 'account'],  # Columns in definition_df
-                          right_on=['cash_type', 'gl_account'],  # Corresponding columns in transactions_df
+                          right_on=['cash_type', 'account'],  # Corresponding columns in transactions_df
                           how='left'
                           )
 
         pending = pd.merge(definition_accounts_df,
                            pending,
                            left_on=['cash_type', 'account'],  # Columns in definition_df
-                           right_on=['cash_type', 'gl_account'],  # Corresponding columns in transactions_df
+                           right_on=['cash_type', 'account'],  # Corresponding columns in transactions_df
                            how='left'
                            )
 

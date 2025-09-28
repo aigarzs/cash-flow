@@ -2,7 +2,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from cash_flow.database.Model import Document
-from cash_flow.database.AEngine import engine
+from cash_flow.database.AEngine import engine_db as engine
 
 with Session(engine) as session:
     stmt = select(Document).where(Document.id == 2)

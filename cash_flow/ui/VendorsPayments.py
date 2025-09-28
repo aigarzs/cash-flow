@@ -5,7 +5,7 @@ from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QDateEdit, QLineE
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from cash_flow.database.Model import Document, DocType, Vendor
+# from cash_flow.database.Model import Document, DocType, Vendor
 from cash_flow.ui.AWidgets import ATable, ATableModel
 from cash_flow.ui.ComboDefinition import ComboDefinition
 
