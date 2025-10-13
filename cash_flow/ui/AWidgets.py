@@ -1,11 +1,13 @@
 import inspect
+import sys
+import threading
 from datetime import date, datetime
 from decimal import Decimal
 from pandas._libs.tslibs.timestamps import Timestamp
 import pandas.api.types as ptypes
 
 import numpy as np
-from PyQt6.QtCore import QAbstractTableModel, Qt, QModelIndex
+from PyQt6.QtCore import QAbstractTableModel, Qt, QModelIndex, QMetaObject, QObject, pyqtSignal, QThread, pyqtSlot
 from PyQt6.QtGui import QBrush, QColor
 from PyQt6.QtWidgets import QTableView, QHeaderView, QMenu
 from sqlalchemy.orm import Session
@@ -14,6 +16,7 @@ from cash_flow.util.Converters import decimal_format, date_format, str_to_date, 
 import pandas as pd
 
 from cash_flow.util.gui import stylesheet_table_headers
+from cash_flow.util.log import get_logger
 
 
 class ATableModel:
@@ -49,7 +52,6 @@ class ATable(QTableView):
     def action_requery(self):
         self.model().requery()
 
-
 class ATableModel(QAbstractTableModel):
     # Populated by requery(), updated by setData
     DATA = pd.DataFrame()
@@ -61,9 +63,12 @@ class ATableModel(QAbstractTableModel):
 
     EMPTY_ROW_AT_BOTTOM = False
 
+    lock = threading.Lock()
+
     def __init__(self, table: ATable, engine: Engine):
         super().__init__(table)
         self.engine = engine
+        self.logger = get_logger(self)
         # This causes ATable to requery twice, since I do requery after gui is built
         # self.requery()
 
@@ -86,8 +91,13 @@ class ATableModel(QAbstractTableModel):
         :return: user-friendly value
         """
         try:
-            value = pandas_to_python(self.DATA.iloc[index.row(), index.column()])
+            with self.lock:
+                val = self.DATA.iloc[index.row(), index.column()]
+            value = pandas_to_python(val)
         except IndexError as err:
+            value = None
+        except Exception as err:
+            self.logger.error(err)
             value = None
 
         return value
@@ -137,70 +147,119 @@ class ATableModel(QAbstractTableModel):
         return super().parent()
 
     def get_column_index(self, column_name: str):
+        with self.lock:
+            data_columns = self.DATA.columns.tolist()
+
         for i in range(self.columnCount()):
-            if self.DATA.columns[i] == column_name:
-                return i
+            if data_columns[i] == column_name:
+                    return i
 
         return None
 
     def get_column_name(self, column_index):
-        try:
-            return self.DATA.columns[column_index]
-        except IndexError as err:
-            return None
-
-    def set_filter(self, filter):
-        self.FILTER = filter
-        # print(self.FILTER)
-        self.requery()
-
-    def requery(self):
-        self.beginResetModel()
-
-        try:
-            df = self._do_requery()
-        except Exception as err:
-            print("Requery error: ", err)
-            df = None
-
-        if df is not None:
-            self.DATA = df
-        else:
-            self.DATA = pd.DataFrame({})
-
-        self.endResetModel()
-        # print(self.DATA)
-
-    def rowCount(self, parent=None):
-        empty_row_count = 1 if self.EMPTY_ROW_AT_BOTTOM else 0
-        return self.DATA.shape[0] + empty_row_count
-
-    def columnCount(self, parent=None):
-        return self.DATA.shape[1]
-
-    def headerData(self, section: int, orientation: Qt.Orientation, role: int = Qt.ItemDataRole.DisplayRole):
-        if role == Qt.ItemDataRole.DisplayRole:
+        with self.lock:
             try:
-                if orientation == Qt.Orientation.Horizontal:
-                    return str(self.DATA.columns[section])
-                elif orientation == Qt.Orientation.Vertical:
-                    return str(self.DATA.index[section])
+                return self.DATA.columns[column_index]
             except IndexError as err:
                 return None
 
+    def set_filter(self, filter):
+        with self.lock:
+            self.FILTER = filter
+            self.logger.debug(f"Filter: {self.FILTER}")
+        self.requery()
 
-        return None
+    def requery(self):
+        self.thread = QThread()
+        self.worker = RequeryWorker(self)
+        self.worker.moveToThread(self.thread)
+
+        self.thread.started.connect(self.worker.run)
+        self.worker.finished.connect(self.on_requery_finished)
+        self.worker.finished.connect(self.thread.quit)
+        self.worker.finished.connect(self.worker.deleteLater)
+        self.thread.finished.connect(self.thread.deleteLater)
+
+        self.logger.debug(f"Requery start")
+
+        self.thread.start()
+
+
+
+
+    @pyqtSlot(pd.DataFrame)
+    def on_requery_finished(self, df):
+        self.logger.debug(f"_on_requery completed")
+        self.beginResetModel()
+
+        with self.lock:
+            self.DATA = df
+            # self.logger.debug("Data types:\n", self.DATA.dtypes)
+            # self.logger.debug(f"Shape: {self.DATA.shape}")
+            # self.logger.debug(f"Columns: {self.DATA.columns}")
+            # self.logger.debug("Data:\n", self.DATA.head())
+            shape = self.DATA.shape
+
+        self.endResetModel()
+        self.logger.info(f"Requery finished. Shape: {shape}")
+
+
+    def rowCount(self, parent=None):
+        empty_row_count = 1 if self.EMPTY_ROW_AT_BOTTOM else 0
+        with self.lock:
+            row_count = self.DATA.shape[0] + empty_row_count
+        # self.logger.debug(f"rowCount: {row_count}")
+        return row_count
+
+    def columnCount(self, parent=None):
+        with self.lock:
+            column_count = self.DATA.shape[1]
+        # self.logger.debug(f"columnCount: {column_count}")
+        return column_count
+
+    def headerData(self, section: int, orientation: Qt.Orientation, role: int = Qt.ItemDataRole.DisplayRole):
+        # self.logger.debug(f"headerData section-{section} orientation-{orientation}")
+        header = None
+
+        if role == Qt.ItemDataRole.DisplayRole:
+            with self.lock:
+                data_columns = self.DATA.columns.tolist()
+                data_index = self.DATA.index
+
+            try:
+                if orientation == Qt.Orientation.Horizontal:
+                    header = str(data_columns[section])
+                elif orientation == Qt.Orientation.Vertical:
+                    header = str(data_index[section])
+            except IndexError as err:
+                # For example index for new record row
+                header = None
+            except Exception as err:
+                self.logger.error(err)
+                header = None
+
+        # self.logger.debug(f"headerData section-{section} orientation-{orientation} : {header}")
+        return header
 
     def data(self, index, role=Qt.ItemDataRole.DisplayRole):
-        if not index.isValid():
-            return None
+        # self.logger.debug(f"data @ {(index.row(), index.column())} , Role {str(role)}")
 
-        if role in (Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole,
+        if not index.isValid():
+            value = None
+
+        elif role in (Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole,
                     Qt.ItemDataRole.CheckStateRole, Qt.ItemDataRole.TextAlignmentRole):
             value = self._get_value(index)
-            return self._format_value(value, role)
+            value = self._format_value(value, role)
+
         elif role == Qt.ItemDataRole.BackgroundRole:
-            return self._format_background(index, role)
+            value = self._format_background(index, role)
+
+        else:
+            value = None
+
+        # self.logger.debug(f"data @ {(index.row(), index.column())} , Role {str(role)}: {value}")
+        return value
 
     def _format_value(self, value, role=Qt.ItemDataRole.DisplayRole):
         """
@@ -253,43 +312,69 @@ class ATableModel(QAbstractTableModel):
         :param role: Qt.ItemDataRole.BackgroundRole
         :return: QBrush - cell background
         """
+        # self.logger.debug(f"cell background {(index.row(), index.column())}")
+        background = None
 
         flags = self.flags(index)
+
         if role == Qt.ItemDataRole.BackgroundRole:
             if Qt.ItemFlag.ItemIsEditable in flags \
                     or Qt.ItemFlag.ItemIsUserCheckable in flags:
                 # This is very dark color, good for dark theme
                 # return QBrush(Qt.GlobalColor.color1)
                 # This is light color, good for light theme
-                return QBrush(QColor("#edf4f7"))
+                background = QBrush(QColor("#edf4f7"))
 
-        return None
+        # self.logger.debug(f"cell background {(index.row(), index.column())} : {background}")
+        return background
 
     def flags(self, index):
         """
-        Override this method
+        Do not override this method.
+        This method is failsafe,
+        Implement _get_flags(index) instead.
+        If this method fails, GUI crashed
         :param index: item index
         :return: flags
 
         """
 
+        try:
+            flags = self._get_flags(index)
+        except Exception as err:
+            self.logger.error(f"Flags error: {err}")
+            flags = QAbstractTableModel.flags(self, index)
+
+        return flags
+
+    def _get_flags(self, index):
+        """"
+        Override this method to get flags based on index.
         """
-        return super().flags(index) | Qt.ItemFlag.ItemIsEditable
         """
-        return super().flags(index)
+        return QAbstractTableModel.flags(self, index) | Qt.ItemFlag.ItemIsEditable
+        """
+
+        return QAbstractTableModel.flags(self, index)
 
     def insert(self, row):
         # row + 1 for that cursor stays on new row
         self.beginInsertRows(QModelIndex(), row+1, row+1)
         new_row = self._generate_default_row()
+
         # Concatenate the DataFrames
-        self.DATA = pd.concat([self.DATA[:row], new_row, self.DATA[row:]])
+        with self.lock:
+            self.DATA = pd.concat([self.DATA[:row], new_row, self.DATA[row:]])
+
         self.endInsertRows()
 
     def delete(self, row):
         self.beginRemoveRows(QModelIndex(), row, row)
         self._delete_row_in_database(row)
-        self.DATA = pd.concat([self.DATA[:row], self.DATA[row + 1:]])
+
+        with self.lock:
+            self.DATA = pd.concat([self.DATA[:row], self.DATA[row + 1:]])
+
         self.endRemoveRows()
 
     def setData(self, index: QModelIndex, value, role: int = Qt.ItemDataRole.EditRole) -> bool:
@@ -302,11 +387,15 @@ class ATableModel(QAbstractTableModel):
             try:
                 value = self._cast_input_to_value(index, value)
                 # print("Accepted value: " + str(value))
-                if index.row() >= len(self.DATA.index):
+                with self.lock:
+                    data_index = self.DATA.index
+
+                if index.row() >= len(data_index):
                     self.insert(index.row())
                 self._set_data_in_database(index, value)
                 # print("Set value in database")
-                self.DATA.iloc[index.row(), index.column()] = value
+                with self.lock:
+                    self.DATA.iloc[index.row(), index.column()] = value
                 # print("Updated DATA")
                 self.parent().resizeColumnToContents(index.column())
                 return True
@@ -318,4 +407,22 @@ class ATableModel(QAbstractTableModel):
         return False
 
 
+class RequeryWorker(QObject):
+    finished = pyqtSignal(pd.DataFrame)
 
+    def __init__(self, model: ATableModel):
+        super().__init__()
+        self.model = model
+        self.logger = get_logger(model)
+
+    def run(self):
+        self.logger.debug(f"RequeryWorker started")
+        try:
+            df = self.model._do_requery()
+            if df is None:
+                df = pd.DataFrame({})
+        except Exception as err:
+            self.logger.error(f"RequeryWorker error: {err}")
+            df = pd.DataFrame({})
+        self.logger.debug(f"RequeryWorker finished")
+        self.finished.emit(df)

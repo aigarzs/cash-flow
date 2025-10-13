@@ -55,7 +55,7 @@ def calculate_cleared_amount_all(engine):
     with Session(engine) as session:
         stmt_entries = select(GeneralLedger
                               ).join(Account
-                              ).where(Account.type_id == AccountType.SETTLEMENT_ACCOUNT)
+                              ).where(Account.type_id.in_((AccountType.CUSTOMERS_ACCOUNT, AccountType.VENDORS_ACCOUNT)))
         entries = session.scalars(stmt_entries).all()
         for entry in entries:
             calculate_cleared_amount(engine, entry.id)
@@ -64,7 +64,7 @@ def calculate_cleared_amount_all_uncleared(engine):
     with Session(engine) as session:
         stmt_entries = select(GeneralLedger
                               ).join(Account
-                              ).where(Account.type_id == AccountType.SETTLEMENT_ACCOUNT,
+                              ).where(Account.type_id.in_((AccountType.CUSTOMERS_ACCOUNT, AccountType.VENDORS_ACCOUNT)),
                                       GeneralLedger.cleared == False)
         entries = session.scalars(stmt_entries).all()
         for entry in entries:
@@ -84,7 +84,7 @@ def clear(engine, account, currency, cr_docid, dr_docid, amount=0):
                                 GeneralLedger.currency == currency,
                                 GeneralLedger.entry_type == "CR",
                                 GeneralLedger.account == account,
-                                Account.type_id == AccountType.SETTLEMENT_ACCOUNT,
+                                Account.type_id.in_((AccountType.CUSTOMERS_ACCOUNT, AccountType.VENDORS_ACCOUNT)),
                             )
                        )
     stmt_dr_gl = (select(GeneralLedger.id,
@@ -97,7 +97,7 @@ def clear(engine, account, currency, cr_docid, dr_docid, amount=0):
                               GeneralLedger.currency == currency,
                               GeneralLedger.entry_type == "DR",
                               GeneralLedger.account == account,
-                              Account.type_id == AccountType.SETTLEMENT_ACCOUNT,
+                              Account.type_id.in_((AccountType.CUSTOMERS_ACCOUNT, AccountType.VENDORS_ACCOUNT)),
                               )
                        )
 
@@ -149,7 +149,7 @@ def clear_auto_partner(engine, account, partner_id, currency):
                        .where(GeneralLedger.cleared == False,
                               GeneralLedger.entry_type == "CR",
                               GeneralLedger.account == account,
-                              Account.type_id == AccountType.SETTLEMENT_ACCOUNT,
+                              Account.type_id.in_((AccountType.CUSTOMERS_ACCOUNT, AccountType.VENDORS_ACCOUNT)),
                               GeneralLedger.currency == currency,
                               GeneralLedger.partner_id == partner_id,
                               )
@@ -170,7 +170,7 @@ def clear_auto_partner(engine, account, partner_id, currency):
                        .where(GeneralLedger.cleared == False,
                               GeneralLedger.entry_type == "DR",
                               GeneralLedger.account == account,
-                              Account.type_id == AccountType.SETTLEMENT_ACCOUNT,
+                              Account.type_id.in_((AccountType.CUSTOMERS_ACCOUNT, AccountType.VENDORS_ACCOUNT)),
                               GeneralLedger.currency == currency,
                               GeneralLedger.partner_id == partner_id,
                               )
@@ -199,7 +199,7 @@ def clear_auto_account(engine, account):
                         .join(Account)
                         .where(GeneralLedger.account == account,
                                GeneralLedger.cleared == False,
-                                Account.type_id == AccountType.SETTLEMENT_ACCOUNT)
+                                Account.type_id.in_((AccountType.CUSTOMERS_ACCOUNT, AccountType.VENDORS_ACCOUNT)))
                         .group_by(GeneralLedger.account,
                                   GeneralLedger.partner_id,
                                   GeneralLedger.currency)
@@ -215,7 +215,7 @@ def clear_auto_all_accounts(engine):
     stmt_accounts = (select(GeneralLedger.account)
                      .join(Account)
                      .where(GeneralLedger.cleared == False,
-                            Account.type_id == AccountType.SETTLEMENT_ACCOUNT)
+                            Account.type_id.in_((AccountType.CUSTOMERS_ACCOUNT, AccountType.VENDORS_ACCOUNT)))
                      .group_by(GeneralLedger.account)
                      )
 
@@ -254,7 +254,7 @@ def clear_jumis_disbursement(engine, disbursement_id):
                                        GeneralLedger.currency)
                          .join(Account)
                          .where(GeneralLedger.cleared == False,
-                                Account.type_id == AccountType.SETTLEMENT_ACCOUNT,
+                                Account.type_id.in_((AccountType.CUSTOMERS_ACCOUNT, AccountType.VENDORS_ACCOUNT)),
                                 GeneralLedger.document_id == disb.DebetDocID))
 
         invoice_entries = session.execute(stmt_disbursement_invoices).fetchall()

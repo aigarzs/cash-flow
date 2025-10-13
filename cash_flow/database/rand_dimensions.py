@@ -32,8 +32,8 @@ def rand_accounts():
     accounts = [
         ["2610", "Kase", AccountType.BANK_ACCOUNT],
         ["2620", "Banka", AccountType.BANK_ACCOUNT],
-        ["2310", "Norēķini ar klientiem", AccountType.SETTLEMENT_ACCOUNT],
-        ["5310", "Norēķini ar piegādātājiem", AccountType.SETTLEMENT_ACCOUNT],
+        ["2310", "Norēķini ar klientiem", AccountType.CUSTOMERS_ACCOUNT],
+        ["5310", "Norēķini ar piegādātājiem", AccountType.VENDORS_ACCOUNT],
         ["6110", "Pārdošanas ieņēmumi", None],
         ["6550", "Citi ieņēmumi", None],
         ["7110", "Izejvielu iegādes", None],

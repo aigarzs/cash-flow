@@ -81,7 +81,7 @@ class PendingPaymentModel(ATableModel):
         next_day_date_through = (pd.to_datetime(date_through) + pd.Timedelta(days=1)).strftime('%Y-%m-%d')
         previous_day_date_from = (pd.to_datetime(date_from) - pd.Timedelta(days=1)).strftime('%Y-%m-%d')
 
-        transactions = pd.read_sql_query("SELECT * FROM G12_CashFlow_Pending_Corresponding WHERE p_date > '" + previous_day_date_from +
+        transactions = pd.read_sql_query("SELECT * FROM H02_CashFlow_Pending_Corresponding WHERE p_date > '" + previous_day_date_from +
                                          "' AND p_date < '" + next_day_date_through + "'", self.engine)
         definition = pd.read_sql_table("E01_CashFlowDefinitionAccounts", self.engine)
         cash_types = pd.DataFrame({"cf_type": ["Receipt", "Payment"], "cf_type_translated": ["Ieņēmums", "Maksājums"]})

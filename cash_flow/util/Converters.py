@@ -14,7 +14,11 @@ def date_format():
     return "%d. %b, %Y"
 
 def str_to_date(date_string):
-    patterns = ["%d", "%d.%m", "%d-%m", "%y.%m.%d", "%y-%m-%d", "%Y.%m.%d", "%Y-%m-%d", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M:%S.%f"]
+    patterns = ["%d",
+                "%d.%m", "%d,%m", "%d-%m",
+                "%y.%m.%d", "%y,%m,%d", "%y-%m-%d",
+                "%Y.%m.%d", "%Y,%m,%d", "%Y-%m-%d",
+                "%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M:%S.%f"]
 
     for format in patterns:
         try:

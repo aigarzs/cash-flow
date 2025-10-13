@@ -109,8 +109,8 @@ class AccountType(Base):
     __tablename__ = "B03_AccountTypes"
 
     BANK_ACCOUNT = 1
-    SETTLEMENT_ACCOUNT = 2
-
+    CUSTOMERS_ACCOUNT = 2
+    VENDORS_ACCOUNT = 3
 
     id = mapped_column(Integer, primary_key=True)
     name = mapped_column(String(100), nullable=False)
@@ -121,8 +121,10 @@ def default_data_account_types(target, connection, **kw):
     sql = "INSERT INTO " + table_name + " (id, name) VALUES (:id, :name)"
     params = [{"id": AccountType.BANK_ACCOUNT,
                "name": "Naudas līdzekļu konts"},
-              {"id": AccountType.SETTLEMENT_ACCOUNT,
-               "name": "Norēķini ar partneriem"},
+              {"id": AccountType.CUSTOMERS_ACCOUNT,
+               "name": "Norēķini ar klientiem"},
+              {"id": AccountType.VENDORS_ACCOUNT,
+               "name": "Norēķini ar piegādātājiem"},
               ]
 
     connection.execute(text(sql), params)

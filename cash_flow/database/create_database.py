@@ -28,32 +28,32 @@ def create_views():
     views_all(engine.connect())
 
 def create_dimensions_data():
-    # rand_accounts()
-    sync_accounts()
-    # rand_currencies()
-    sync_currencies()
-    sync_currencyrates()
-    # rand_doctypes()
-    sync_doctypes()
-    # rand_partners()
-    sync_partners()
+    rand_accounts()
+    # sync_accounts()
+    rand_currencies()
+    # sync_currencies()
+    # sync_currencyrates()
+    rand_doctypes()
+    # sync_doctypes()
+    rand_partners()
+    # sync_partners()
 
 
 def create_documents_data():
-    sync_documents()
-    # rand_documents()
+    # sync_documents()
+    rand_documents()
 
 def create_clearings_data():
     engine = create_engine_db()
     # pass
     delete_all_reconciliations(engine)
-    sync_jummis_disbursement()
+    # sync_jummis_disbursement()
     clear_auto_all_accounts(engine)
 
 
 if __name__ == '__main__':
-    # create_tables()
-    # create_views()
+    create_tables()
+    create_views()
     create_dimensions_data()
     create_documents_data()
     create_clearings_data()

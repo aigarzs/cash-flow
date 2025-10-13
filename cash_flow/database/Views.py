@@ -3,6 +3,9 @@ from cash_flow.database.AEngine import create_engine_db
 import inspect
 import sys
 
+from cash_flow.util.log import get_logger
+
+logger = get_logger("Views")
 
 def views_all(connection):
 
@@ -16,7 +19,7 @@ def views_all(connection):
             function(connection)
 
 def view_general_ledger(connection):
-    print("Updating view G00_GeneralLedger")
+    logger.info("Updating view G00_GeneralLedger")
     drop = "DROP VIEW IF EXISTS G00_GeneralLedger"
     create = """CREATE VIEW G00_GeneralLedger AS
             SELECT 
@@ -40,7 +43,7 @@ def view_general_ledger(connection):
 
 
 def view_cash_transactions(connection):
-    print("Updating view G01_CashTransactions")
+    logger.info("Updating view G01_CashTransactions")
     drop = "DROP VIEW IF EXISTS G01_CashTransactions"
     create = """CREATE VIEW G01_CashTransactions AS
                 SELECT 
@@ -72,7 +75,7 @@ def view_cash_transactions(connection):
     connection.execute(text(create))
 
 def view_cash_generalledger(connection):
-    print("Updating view G02_Cash_GeneralLedger")
+    logger.info("Updating view G02_Cash_GeneralLedger")
     drop = "DROP VIEW IF EXISTS G02_Cash_GeneralLedger"
     create = """CREATE VIEW G02_Cash_GeneralLedger AS
             SELECT 
@@ -101,7 +104,7 @@ def view_cash_generalledger(connection):
     connection.execute(text(create))
 
 def view_cash_corresponding(connection):
-    print("Updating view G03_CashTransactions_Corresponding")
+    logger.info("Updating view G03_CashTransactions_Corresponding")
     drop = "DROP VIEW IF EXISTS G03_CashTransactions_Corresponding"
     create = """CREATE VIEW G03_CashTransactions_Corresponding AS
             SELECT 
@@ -131,8 +134,8 @@ def view_cash_corresponding(connection):
     connection.execute(text(create))
 
 def view_cash_reconciliations(connection):
-    print("Updating view G04_CashTransactions_Reconciliations_CR")
-    print("Updating view G04_CashTransactions_Reconciliations_DR")
+    logger.info("Updating view G04_CashTransactions_Reconciliations_CR")
+    logger.info("Updating view G04_CashTransactions_Reconciliations_DR")
     drop_cr = "DROP VIEW IF EXISTS G04_CashTransactions_Reconciliations_CR"
     drop_dr = "DROP VIEW IF EXISTS G04_CashTransactions_Reconciliations_DR"
     create_cr = """CREATE VIEW G04_CashTransactions_Reconciliations_CR AS
@@ -157,7 +160,7 @@ def view_cash_reconciliations(connection):
                 
                 FROM G03_CashTransactions_Corresponding AS cash
                 LEFT JOIN D04_Reconciliations AS r
-                ON cash.account_type = 2 AND cash.entry_type = "CR" AND cash.account = r.account AND cash.currency = r.currency AND cash.d_id = r.cr_docid 
+                ON cash.account_type IN (2, 3) AND cash.entry_type = "CR" AND cash.account = r.account AND cash.currency = r.currency AND cash.d_id = r.cr_docid 
                 LEFT JOIN D03_GeneralLedger AS corr 
                 ON corr.account = r.account AND corr.entry_type = "DR" AND corr.currency = r.currency AND corr.document_id = r.dr_docid
                 WHERE r.id IS NOT NULL
@@ -184,7 +187,7 @@ def view_cash_reconciliations(connection):
                 
                 FROM G03_CashTransactions_Corresponding AS cash
                 LEFT JOIN D04_Reconciliations AS r
-                ON cash.account_type = 2 AND cash.entry_type = "DR" AND cash.account = r.account AND cash.currency = r.currency AND cash.d_id = r.dr_docid 
+                ON cash.account_type IN (2, 3) AND cash.entry_type = "DR" AND cash.account = r.account AND cash.currency = r.currency AND cash.d_id = r.dr_docid 
                 LEFT JOIN D03_GeneralLedger AS corr 
                 ON corr.account = r.account AND corr.entry_type = "CR" AND corr.currency = r.currency AND corr.document_id = r.cr_docid
                 WHERE r.id IS NOT NULL
@@ -196,8 +199,8 @@ def view_cash_reconciliations(connection):
     connection.execute(text(create_dr))
 
 def view_cash_reconciled(connection):
-    print("Updating view G05_CashTransactions_Reconciled_CR")
-    print("Updating view G05_CashTransactions_Reconciled_DR")
+    logger.info("Updating view G05_CashTransactions_Reconciled_CR")
+    logger.info("Updating view G05_CashTransactions_Reconciled_DR")
     drop_cr = "DROP VIEW IF EXISTS G05_CashTransactions_Reconciled_CR"
     drop_dr = "DROP VIEW IF EXISTS G05_CashTransactions_Reconciled_DR"
     create_cr = """CREATE VIEW G05_CashTransactions_Reconciled_CR AS
@@ -249,7 +252,7 @@ def view_cash_reconciled(connection):
     connection.execute(text(create_dr))
 
 def view_cash_union(connection):
-    print("Updating view G06_CashTransactions_Union")
+    logger.info("Updating view G06_CashTransactions_Union")
     drop = "DROP VIEW IF EXISTS G06_CashTransactions_Union"
     create = """CREATE VIEW G06_CashTransactions_Union AS
                 SELECT
@@ -290,7 +293,7 @@ def view_cash_union(connection):
     connection.execute(text(create))
 
 def view_cash_aggregated(connection):
-    print("Updating view G07_CashTransactions_Aggregated")
+    logger.info("Updating view G07_CashTransactions_Aggregated")
     drop = "DROP VIEW IF EXISTS G07_CashTransactions_Aggregated"
     create = """CREATE VIEW G07_CashTransactions_Aggregated AS
                 SELECT
@@ -309,7 +312,7 @@ def view_cash_aggregated(connection):
     connection.execute(text(create))
 
 def view_cashflow_actual(connection):
-    print("Updating view G08_CashFlow_Actual")
+    logger.info("Updating view G08_CashFlow_Actual")
     drop = "DROP VIEW IF EXISTS G08_CashFlow_Actual"
     create = """CREATE VIEW G08_CashFlow_Actual AS
                 SELECT
@@ -348,7 +351,7 @@ def view_cashflow_actual(connection):
 
 
 def view_cashflow_actual_corresponding(connection):
-    print("Updating view G09_CashFlow_Actual_Corresponding")
+    logger.info("Updating view G09_CashFlow_Actual_Corresponding")
     drop = "DROP VIEW IF EXISTS G09_CashFlow_Actual_Corresponding"
     create = """CREATE VIEW G09_CashFlow_Actual_Corresponding AS
                 SELECT 
@@ -363,31 +366,38 @@ def view_cashflow_actual_corresponding(connection):
     connection.execute(text(create))
 
 
-def view_casflow_pending(connection):
-    print("Updating view G11_CashFlow_Pending")
-    drop = "DROP VIEW IF EXISTS G11_CashFlow_Pending"
-    create = """SELECT 
+def view_documents_pending(connection):
+    logger.info("Updating view H01_Documents_Pending")
+    drop = "DROP VIEW IF EXISTS H01_Documents_Pending"
+    create = """CREATE VIEW H01_Documents_Pending AS
+                SELECT 
                     gl.id AS id,
                     d.id AS d_id,
                     "Pending" AS cash_status,
-                    IIF(gl.entry_type = "DR", "Receipt", "Payment") AS cash_type,
+                    IIF(a.type_id = 2, "Receipt", "Payment") AS cash_type,
                     dt.name AS d_type,
                     d.number AS number,
                     gl.date AS date,
+                    gl.date_due AS date_due,
                     IIF(gl.date_planned_clearing IS NULL, IIF(gl.date_due IS NULL OR gl.date_due < DATE(), DATE(), gl.date_due), IIF(gl.date_planned_clearing < DATE(), DATE(), gl.date_planned_clearing)) AS p_date,
                     d.description AS description,
-                    d.partner_id AS partner_id,
+                    gl.partner_id AS partner_id,
                     p.name AS partner_name,
+                    gl.entry_type AS gl_entry_type,
+                    gl.account AS gl_account,
+                    a.type_id AS gl_account_type,
                     gl.currency AS currency,
-                    gl.entry_type AS entry_type,
-                    gl.account AS account,
-                    a.type_id AS account_type,
-                    gl.amount AS amount,
-                    gl.amount_LC AS amount_LC,
-                    gl.amount - gl.cleared_amount AS remaining_amount,
-                    (gl.amount_LC / gl.amount ) * (gl.amount - gl.cleared_amount) AS remaining_amount_LC,
+                    IIF(a.type_id = 2, 1, -1) * IIF(gl.entry_type = "DR", 1, -1) * gl.amount AS amount,
+                    IIF(a.type_id = 2, 1, -1) * IIF(gl.entry_type = "DR", 1, -1) * gl.amount_LC AS amount_LC,
+                    IIF(a.type_id = 2, 1, -1) * IIF(gl.entry_type = "DR", 1, -1) * gl.cleared_amount AS cleared_amount,
+                    IIF(a.type_id = 2, 1, -1) * IIF(gl.entry_type = "DR", 1, -1) * (gl.amount_LC / gl.amount) * gl.cleared_amount AS cleared_amount_LC,
+                    IIF(a.type_id = 2, 1, -1) * IIF(gl.entry_type = "DR", 1, -1) * (gl.amount - gl.cleared_amount) AS remaining_amount,
+                    IIF(a.type_id = 2, 1, -1) * IIF(gl.entry_type = "DR", 1, -1) * (gl.amount_LC / gl.amount ) * (gl.amount - gl.cleared_amount) AS remaining_amount_LC,
                     ((gl.amount - gl.cleared_amount) / gl.amount) AS r_rate,
+                    gl.cleared AS cleared,
+                    gl.date_cleared AS date_cleared,
                     gl.memo AS memo,
+                    gl.priority AS priority,
                     gl.void AS void 
                 FROM G00_GeneralLedger AS gl
                 JOIN B02_Accounts AS a 
@@ -397,17 +407,19 @@ def view_casflow_pending(connection):
                 LEFT JOIN D02_DocTypes AS dt
                     ON d.type_id = dt.id
                 LEFT JOIN B04_Partners AS p
-                    ON d.partner_id = p.id
-                WHERE a.type_id = 2 AND gl.cleared = 0 AND gl.void = 0
+                    ON gl.partner_id = p.id
+                LEFT JOIN G01_CashTransactions AS cash
+                    ON gl.document_id = cash.d_id
+                WHERE cash.id IS NULL AND a.type_id IN (2, 3) AND gl.amount <> 0
                 """
 
     connection.execute(text(drop))
     connection.execute(text(create))
 
 def view_casflow_pending_corresponding(connection):
-    print("Updating view G12_CashFlow_Pending_Corresponding")
-    drop = "DROP VIEW IF EXISTS G12_CashFlow_Pending_Corresponding"
-    create = """CREATE VIEW G12_CashFlow_Pending_Corresponding AS
+    logger.info("Updating view H02_CashFlow_Pending_Corresponding")
+    drop = "DROP VIEW IF EXISTS H02_CashFlow_Pending_Corresponding"
+    create = """CREATE VIEW H02_CashFlow_Pending_Corresponding AS
                 SELECT 
                     cf.d_id,
                     cf.cash_status,
@@ -422,15 +434,12 @@ def view_casflow_pending_corresponding(connection):
                     gl.currency,
                     gl.entry_type,
                     gl.account,
-                    a.type_id AS account_type,
                     gl.amount * cf.r_rate AS p_amount,
                     gl.amount_LC * cf.r_rate AS p_amount_LC
-                FROM G11_CashFlow_Pending AS cf
+                FROM H01_Documents_Pending AS cf
                 LEFT JOIN G00_GeneralLedger AS gl 
                     ON cf.d_id = gl.document_id
-                LEFT JOIN B02_Accounts AS a 
-                    ON gl.account = a.code 
-                WHERE a.type_id <> 2 OR a.type_id IS NULL
+                WHERE gl.account <> cf.gl_account AND (cf.void = 0 OR cf.void IS NULL) AND cf.cleared = 0
                 ORDER BY cf.p_date, cf.d_id
                 """
 
@@ -438,89 +447,82 @@ def view_casflow_pending_corresponding(connection):
     connection.execute(text(create))
 
 
-def view_invoice_reconciliations(connection):
-    print("Updating view H01_Invoice_Reconciliations")
-    drop = "DROP VIEW IF EXISTS H01_Invoice_Reconciliations"
-    create = """CREATE VIEW H01_Invoice_Reconciliations AS
+def view_reconciliations(connection):
+    logger.info("Updating view H03_Reconciliations_CR")
+    logger.info("Updating view H04_Reconciliations_DR")
+
+    drop_cr = "DROP VIEW IF EXISTS H03_Reconciliations_CR"
+    drop_dr = "DROP VIEW IF EXISTS H04_Reconciliations_DR"
+
+    create_cr = """CREATE VIEW H03_Reconciliations_CR AS
                 SELECT 
                     r.id,
-                    r.invoice_id,
-                    r.payment_id,
-                    p.type_id AS p_type_id,    
-                    t.name AS p_type_name,
-                    p.number AS p_number,
-                    p.date AS p_date,
-                    p.description AS p_description,
-                    p.customer_id AS p_customer_id,
-                    c.name AS p_customer_name,
-                    p.vendor_id AS p_vendor_id,
-                    v.name AS p_vendor_name,
+                    r.dr_docid,
+                    r.cr_docid,
+                    doc.type_id AS type_id,    
+                    t.name AS type_name,
+                    doc.number AS number,
+                    cr.date AS date,
+                    doc.description AS description,
+                    cr.partner_id AS partner_id,
+                    p.name AS partner_name,
                     r.amount AS r_amount,
-                    r.currency AS r_currency,
-                    p.amount AS p_amount,
-                    p.currency AS p_currency
-    
-    
-                FROM
-                    D04_Reconciliations AS r 
-                LEFT JOIN
-                    D01_Documents AS p ON r.payment_id = p.id
-                LEFT JOIN
-                    D02_DocTypes AS t on p.type_id = t.id
-                LEFT JOIN
-                    B04_Customers AS c ON p.customer_id = c.id
-                LEFT JOIN
-                    B05_Vendors AS v ON p.vendor_id = v.id
+                    r.currency AS currency,
+                    cr.amount AS cr_amount
+                        
+                FROM D04_Reconciliations AS r 
+                LEFT JOIN D03_GeneralLedger AS cr 
+                    ON r.cr_docid = cr.document_id AND r.currency = cr.currency AND r.account = cr.account
+                LEFT JOIN D01_Documents AS doc
+                    ON cr.document_id = doc.id
+                LEFT JOIN D02_DocTypes AS t 
+                    ON doc.type_id = t.id
+                LEFT JOIN B04_Partners AS p 
+                    ON cr.partner_id = p.id
+                
                     
-                ORDER BY p.date DESC, r.payment_id
+                ORDER BY cr.date DESC, cr.id DESC
                 """
+    create_dr = """CREATE VIEW H04_Reconciliations_DR AS
+                    SELECT 
+                        r.id,
+                        r.dr_docid,
+                        r.cr_docid,
+                        doc.type_id AS type_id,    
+                        t.name AS type_name,
+                        doc.number AS number,
+                        dr.date AS date,
+                        doc.description AS description,
+                        dr.partner_id AS partner_id,
+                        p.name AS partner_name,
+                        r.amount AS r_amount,
+                        r.currency AS currency,
+                        dr.amount AS dr_amount
 
-    connection.execute(text(drop))
-    connection.execute(text(create))
+                    FROM D04_Reconciliations AS r 
+                    LEFT JOIN D03_GeneralLedger AS dr 
+                        ON r.dr_docid = dr.document_id AND r.currency = dr.currency AND r.account = dr.account
+                    LEFT JOIN D01_Documents AS doc
+                        ON dr.document_id = doc.id
+                    LEFT JOIN D02_DocTypes AS t 
+                        ON doc.type_id = t.id
+                    LEFT JOIN B04_Partners AS p 
+                        ON dr.partner_id = p.id
 
 
-def view_payment_reconciliations(connection):
-    print("Updating view H02_Payment_Reconciliations")
-    drop = "DROP VIEW IF EXISTS H02_Payment_Reconciliations"
-    create = """CREATE VIEW H02_Payment_Reconciliations AS
-                SELECT 
-                    r.id,
-                    r.invoice_id,
-                    r.payment_id,
-                    i.type_id AS i_type_id,    
-                    t.name AS i_type_name,
-                    i.number AS i_number,
-                    i.date AS i_date,
-                    i.description AS i_description,
-                    i.customer_id AS i_customer_id,
-                    c.name AS i_customer_name,
-                    i.vendor_id AS i_vendor_id,
-                    v.name AS i_vendor_name,
-                    r.amount AS r_amount,
-                    r.currency AS r_currency,
-                    i.amount AS i_amount,
-                    i.currency AS i_currency
-    
-                FROM
-                    D04_Reconciliations AS r 
-                LEFT JOIN
-                    D01_Documents AS i ON r.invoice_id = i.id
-                LEFT JOIN
-                    D02_DocTypes AS t on i.type_id = t.id
-                LEFT JOIN
-                    B04_Customers AS c ON i.customer_id = c.id
-                LEFT JOIN
-                    B05_Vendors AS v ON i.vendor_id = v.id
-                    
-                ORDER BY i.date, r.invoice_id
-                """
+                    ORDER BY dr.date DESC, dr.id DESC
+                    """
 
-    connection.execute(text(drop))
-    connection.execute(text(create))
+
+    connection.execute(text(drop_cr))
+    connection.execute(text(drop_dr))
+    connection.execute(text(create_cr))
+    connection.execute(text(create_dr))
+
 
 
 def view_import_documents(connection):
-    print("Updating view I01_Import_FinancialDoc")
+    logger.info("Updating view I01_Import_FinancialDoc")
     drop = "DROP VIEW IF EXISTS I01_Import_FinancialDoc"
     create = """CREATE VIEW I01_Import_FinancialDoc AS
                 SELECT 
@@ -545,7 +547,7 @@ def view_import_documents(connection):
     connection.execute(text(create))
 
 def view_import_gl(connection):
-    print("Updating view I02_Import_FinancialDocLine")
+    logger.info("Updating view I02_Import_FinancialDocLine")
     drop = "DROP VIEW IF EXISTS I02_Import_FinancialDocLine"
     create = """CREATE VIEW I02_Import_FinancialDocLine AS
                 WITH gl AS 

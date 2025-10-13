@@ -407,7 +407,7 @@ class CashFlowReportModel(ATableModel):
         actual = pd.read_sql_query(
             'SELECT * FROM G09_CashFlow_Actual_Corresponding WHERE date < "' + next_day_date_through + '" ', engine)
         pending = pd.read_sql_query(
-            'SELECT * FROM G12_CashFlow_Pending_Corresponding WHERE p_date < "' + next_day_date_through + '" ', engine)
+            'SELECT * FROM H02_CashFlow_Pending_Corresponding WHERE p_date < "' + next_day_date_through + '" ', engine)
         budgeted = pd.read_sql_query(
             'SELECT * FROM F01_BudgetEntries WHERE date > "' + previous_day_date_from + '" AND date < "' + next_day_date_through + '" ',
             engine)
