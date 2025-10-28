@@ -18,6 +18,7 @@ openpyxl = "^3.1.5"
 matplotlib = "3.8.4"
 mplcursors = "^0.6"
 pyodbc = "^5.2.0"
+pyinstaller = "^6.16.0"
 
 
 [build-system]

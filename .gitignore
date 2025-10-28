@@ -5,6 +5,8 @@ __pycache__/
 *$py.class
 
 log/
+app_log.csv
+build/
 .idea/
 .env
 poetry.lock

@@ -1,7 +1,9 @@
+import sys
+import threading
 from datetime import date, datetime
 
 from PyQt6.QtCore import Qt, QModelIndex
-from PyQt6.QtGui import QBrush, QColor
+from PyQt6.QtGui import QBrush, QColor, QIcon
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QDateEdit, QLabel, QComboBox, QPushButton, QFileDialog, \
     QTabWidget, QCheckBox, QApplication, QStackedWidget
 
@@ -23,11 +25,14 @@ from cash_flow.ui.Browse_BudgetedReceipt import Browse_BudgetedReceipt
 from cash_flow.ui.Browse_PendingPayment import Browse_PendingPayment
 from cash_flow.ui.Browse_PendingReceipt import Browse_PendingReceipt
 from cash_flow.util.Converters import date_format
+from cash_flow.util.log import get_logger
 
-from Browse_ActualReceipt import Browse_ActualReceipt
+
+# from Browse_ActualReceipt import Browse_ActualReceipt
 
 
 class CashFlowReport(QWidget):
+    logger = get_logger("CashFlowReport")
 
     def __init__(self, engine):
         super().__init__(None)
@@ -71,40 +76,21 @@ class CashFlowReport(QWidget):
         filterbox_freq.addWidget(label_freq)
         filterbox_freq.addWidget(self.filter_Frequency)
 
-        table_widget = QWidget()
-        table_box = QVBoxLayout()
-        table_toolbox = QHBoxLayout()
-        btn_excel_cashflow = QPushButton("Eksportēt uz Excel")
-        btn_excel_cashflow.clicked.connect(self.export_to_excel_cashflow)
-        table_toolbox.addStretch()
-        table_toolbox.addWidget(btn_excel_cashflow)
-        self.table = ATable(self)
-        self.table.setModel(CashFlowReportModel(self.table, self.engine))
-        table_box.addLayout(table_toolbox)
-        table_box.addWidget(self.table)
-        table_widget.setLayout(table_box)
-
         graph_widget = QWidget()
         graph_layout = QVBoxLayout(self)
 
-        # Add export button
         graph_toolbox = QHBoxLayout()
         label_legend = QLabel("Rādīt leģendu")
-        check_legend = QCheckBox()
-        check_legend.setChecked(True)
-        self.show_legend = True
-        check_legend.stateChanged.connect(self.toggle_legend)
+        self.check_legend = QCheckBox()
+        self.check_legend.setChecked(True)
+        self.check_legend.stateChanged.connect(self.toggle_legend)
         btn_jpg = QPushButton("Eksportēt uz JPG")
         btn_jpg.clicked.connect(self.export_to_jpg)
         graph_toolbox.addWidget(label_legend)
-        graph_toolbox.addWidget(check_legend)
+        graph_toolbox.addWidget(self.check_legend)
         graph_toolbox.addStretch()
         graph_toolbox.addWidget(btn_jpg)
-        self.canvas = FigureCanvas(plt.Figure(figsize=(12, 6)))
-        self.cursor_bars = None
-        # self.cursor_lines = None
-        self.bar_artists = []
-        self.annotations = []
+        self.canvas = CashFlowCanvas()
         self.canvas.mpl_connect("button_press_event", self.hide_tooltips)
 
         graph_layout.addLayout(graph_toolbox)
@@ -124,7 +110,7 @@ class CashFlowReport(QWidget):
         checkreport_toolbox.addWidget(btn_browse)
         checkreport_toolbox.addWidget(btn_excel_checkreport)
         self.checkreport = CheckingReportTable(self.requery, self)
-        self.checkreport.setModel(CheckingReportModel(self.checkreport, self.engine, self.table.model()))
+        self.checkreport.setModel(CheckingReportModel(self.checkreport, self.engine))
         self.checkreport.doubleClicked.connect(self.browse_checkreport)
         checkreport_box.addLayout(checkreport_toolbox)
         checkreport_box.addWidget(self.checkreport)
@@ -145,6 +131,19 @@ class CashFlowReport(QWidget):
         self.checkreport_stacked.addWidget(self.browse_budgeted_receipt)
         self.checkreport_stacked.addWidget(self.browse_budgeted_payment)
 
+        table_widget = QWidget()
+        table_box = QVBoxLayout()
+        table_toolbox = QHBoxLayout()
+        btn_excel_cashflow = QPushButton("Eksportēt uz Excel")
+        btn_excel_cashflow.clicked.connect(self.export_to_excel_cashflow)
+        table_toolbox.addStretch()
+        table_toolbox.addWidget(btn_excel_cashflow)
+        self.table = ATable(self)
+        self.table.setModel(CashFlowReportModel(self.table, self.engine, self.canvas, self.checkreport))
+        table_box.addLayout(table_toolbox)
+        table_box.addWidget(self.table)
+        table_widget.setLayout(table_box)
+
         tabs = QTabWidget()
         tabs.addTab(table_widget, "Naudas plūsmas atskaite")
         tabs.addTab(graph_widget, "Naudas plūsmas grafiks")
@@ -161,11 +160,12 @@ class CashFlowReport(QWidget):
     def requery(self):
         selected_freq = self.filter_Frequency.currentText()
         freq = self.freq_map[selected_freq]
+        legend = self.check_legend.checkState().value
         self.table.model().set_filter({"date from": self.filter_dateFrom.date().toPyDate(),
                                        "date through": self.filter_dateThrough.date().toPyDate(),
-                                       "frequency": freq})
-        self.plot_cashflow()
-        self.checkreport.model().requery()
+                                        "frequency": freq,
+                                       "show legend": legend})
+
 
     def return_checkreport(self):
         self.checkreport_stacked.setCurrentWidget(self.checkreport_widget)
@@ -254,45 +254,58 @@ class CashFlowReport(QWidget):
         self.hide_tooltips()
         file_path, _ = QFileDialog.getSaveFileName(self, "Save Image", "", "JPG files (*.jpg);;All Files (*)")
         if file_path:
-            original_facecolor = self.canvas.figure.get_facecolor()
-            self.canvas.figure.set_facecolor('white')
             self.canvas.figure.savefig(file_path, format='jpg')
-            self.canvas.figure.set_facecolor(original_facecolor)
-            self.plot_cashflow()
+
 
     def toggle_legend(self, state):
         if state == Qt.CheckState.Checked.value:
-            self.show_legend = True
+            show_legend = True
         else:
-            self.show_legend = False
+            show_legend = False
 
-        self.plot_cashflow()
+        self.canvas.plot_cashflow(show_legend)
 
     def hide_tooltips(self, event=None):
-        for ann in self.annotations:
+        for ann in self.canvas.annotations:
             ann.set_visible(False)
-        self.annotations.clear()
+        self.canvas.annotations.clear()
         self.canvas.draw_idle()
 
 
-    def plot_cashflow(self):
-        # print("plot_cashflow()")
-        cashflow = self.table.model().graph_pivot
-        balances = self.table.model().graph_balances
-        self.canvas.figure.clf()
-        ax = self.canvas.figure.add_subplot(111)
-        periods = cashflow.columns
+class CashFlowCanvas(FigureCanvas):
+    df_cashflow = pd.DataFrame({})
+    balances = []
+    annotations = []
+    lock = threading.Lock()
+
+    def __init__(self, parent=None, width=5, height=4, dpi=100):
+        super(CashFlowCanvas, self).__init__(plt.Figure(figsize=(12, 6)))
+
+
+    def set_data(self, df_cashflow, balances):
+        with self.lock:
+            self.df_cashflow = df_cashflow
+            self.balances = balances
+
+
+    def plot_cashflow(self, show_legend=True):
+        with self.lock:
+            df_cashflow = self.df_cashflow
+            balances = self.balances
+
+        self.figure.clf()
+        ax = self.figure.add_subplot(111)
+        periods = df_cashflow.columns
         x = np.arange(len(periods))
 
         pos_bottom = np.zeros(len(periods))
         neg_bottom = np.zeros(len(periods))
         colors = plt.cm.tab20.colors
 
-        self.bar_artists = []
-        self.annotations = []
+        bar_artists = []
 
-        for i, account in enumerate(cashflow.index):
-            values = cashflow.loc[account].values
+        for i, account in enumerate(df_cashflow.index):
+            values = df_cashflow.loc[account].values
             bar_vals = []
             bar_bottom = []
 
@@ -315,9 +328,9 @@ class CashFlowReport(QWidget):
 
             for idx, bar in enumerate(bars):
                 if bar_vals[idx] != 0:
-                    self.bar_artists.append((bar, account, bar_vals[idx], periods[idx]))
+                    bar_artists.append((bar, account, bar_vals[idx], periods[idx]))
 
-        net_cashflow = cashflow.sum(axis=0).values
+        net_cashflow = df_cashflow.sum(axis=0).values
         line1, = ax.plot(x, net_cashflow, color='black', label='Neto naudas plūsma', marker='o', linewidth=2)
 
         line2, = ax.plot(x, balances, color='blue', label='Bilance', linestyle='--', marker='x',
@@ -328,22 +341,22 @@ class CashFlowReport(QWidget):
         ax.set_ylabel("Summa BV")
         ax.set_title("Naudas plūsma pa periodiem")
         ax.grid(True)
-        if self.show_legend:
+        if show_legend:
             ax.legend()
 
-        if self.cursor_bars:
-            self.cursor_bars.remove()
+        # if self.cursor_bars:
+        #     self.cursor_bars.remove()
 
         """
         if self.cursor_lines:
             self.cursor_lines.remove()
         """
 
-        self.cursor_bars = mplcursors.cursor([b[0] for b in self.bar_artists], hover=True)
+        cursor_bars = mplcursors.cursor([b[0] for b in bar_artists], hover=True)
 
-        @self.cursor_bars.connect("add")
+        @cursor_bars.connect("add")
         def on_add_bar(sel):
-            bar, account, val, period = next((b for b in self.bar_artists if b[0] == sel.artist),
+            bar, account, val, period = next((b for b in bar_artists if b[0] == sel.artist),
                                              (None, None, None, None))
             if bar:
                 sel.annotation.set_text(f"{account}\n{period.strftime(date_format())}\n{val:,.2f}")
@@ -352,7 +365,7 @@ class CashFlowReport(QWidget):
                 self.annotations.append(sel.annotation)
 
         """
-        
+
         self.cursor_lines = mplcursors.cursor([line1, line2], hover=True)
 
         @self.cursor_lines.connect("add")
@@ -365,20 +378,56 @@ class CashFlowReport(QWidget):
             self.annotations.append(sel.annotation)
         """
 
-        self.canvas.draw()
+        self.draw()
 
 
+
+
+class CheckingReportTable(ATable):
+    def __init__(self, requery_method, parent=None):
+        super().__init__(parent)
+        self.requery_method = requery_method
+
+    def action_requery(self):
+        self.requery_method()
+
+class CheckingReportModel(ATableModel):
+
+    def __init__(self, table, engine):
+        super().__init__(table, engine)
+
+
+    def set_data(self, data):
+        with self.lock:
+            self.DATA = data
+
+    def _do_requery(self):
+
+        with self.lock:
+            df = self.DATA
+
+        df.columns = ["Periods", "NP ID", "NP nosaukums", "Fakts ieņēmumi", "Fakts maksājumi",
+                                        "Sagaidāmie ieņēmumi", "Sagaidāmie maksājumi",
+                                        "Budžeta ieņēmumi", "Budžeta maksājumi", "Fakts plus sagaidāmie ieņēmumi",
+                                        "Fakts plus sagaidāmie maksājumi",
+                                        "Ieņēmumi", "Maksājumi", "Neto naudas plūsma"]
+
+        return df
 
 
 class CashFlowReportModel(ATableModel):
+    def __init__(self, table, engine, cf_figure: CashFlowCanvas, cf_checking: CheckingReportTable):
+        super(CashFlowReportModel, self).__init__(table, engine)
+        self.cf_figure = cf_figure
+        self.cf_checking = cf_checking
 
     def _do_requery(self):
-        engine = self.engine
-
-        # Setup filters
-        date_from = self.FILTER["date from"].strftime("%Y-%m-%d")
-        date_through = self.FILTER["date through"].strftime("%Y-%m-%d")
-        period = self.FILTER["frequency"]
+        with self.lock:
+            engine = self.engine
+            date_from = self.FILTER["date from"].strftime("%Y-%m-%d")
+            date_through = self.FILTER["date through"].strftime("%Y-%m-%d")
+            period = self.FILTER["frequency"]
+            show_legend = self.FILTER["show legend"]
 
         # Mapping period to offset (end of period)
         period_offsets = {
@@ -523,15 +572,15 @@ class CashFlowReportModel(ATableModel):
 
         # Create and store cashflow checking report
 
-        self.checking_report = pd.merge(definition_acc_df, cashflow, on="definition_id", how="right")
-        self.checking_report.sort_values(["period_end", "key"], inplace=True)
-        self.checking_report.drop(columns=["key", "definition_type"], inplace=True)
-        self.checking_report = self.checking_report.reindex(
+        checking_report = pd.merge(definition_acc_df, cashflow, on="definition_id", how="right")
+        checking_report.sort_values(["period_end", "key"], inplace=True)
+        checking_report.drop(columns=["key", "definition_type"], inplace=True)
+        checking_report = checking_report.reindex(
             columns=["period_end", "definition_id", "name", "Actual_Receipt", "Actual_Payment", "Pending_Receipt", "Pending_Payment",
                      "Budgeted_Receipt", "Budgeted_Payment", "actual_plus_pending_income",
                      "actual_plus_pending_expense",
                      "income", "expense", "net_cashflow"])
-        self.checking_report = self.checking_report[self.checking_report["period_end"] >= pd.to_datetime(date_from)]
+        checking_report = checking_report[checking_report["period_end"] >= pd.to_datetime(date_from)]
 
         # -------------------
         # CASHFLOW OUTPUT
@@ -560,9 +609,9 @@ class CashFlowReportModel(ATableModel):
         pivot_cf = pivot_cf.sort_index(axis=1)
 
         # Store pivot_cf for cash flow figure
-        self.graph_pivot = pd.merge(definition_acc_df, pivot_cf, on="definition_id", how="right")
-        self.graph_pivot.drop(columns=["definition_id", "key", "definition_type"], inplace=True)
-        self.graph_pivot = self.graph_pivot.set_index("name")
+        graph_pivot = pd.merge(definition_acc_df, pivot_cf, on="definition_id", how="right")
+        graph_pivot.drop(columns=["definition_id", "key", "definition_type"], inplace=True)
+        graph_pivot = graph_pivot.set_index("name")
 
         # Ensure 0 instead of NaN in empty rows
         pivot_cf = pd.merge(definition_acc_df["definition_id"], pivot_cf, left_on="definition_id",
@@ -662,7 +711,7 @@ class CashFlowReportModel(ATableModel):
         )
 
         # Store balances for use in Graph
-        self.graph_balances = all_closing_balances.values
+        graph_balances = all_closing_balances.values
 
         # Create a new DataFrame with repeated rows for each definition_id
         balances = pd.merge(definition_bal_df["definition_id"], balances, how='cross')
@@ -696,30 +745,15 @@ class CashFlowReportModel(ATableModel):
         # Format column headers to show only the date part
         report.columns = [col.strftime(date_format()) if not pd.isnull(col) else col for col in report.columns]
 
-        self.FORMAT = format_df
+        with self.lock:
+            self.FORMAT = format_df
+
+        self.cf_figure.set_data(graph_pivot, graph_balances)
+        self.cf_figure.plot_cashflow(show_legend)
+        self.cf_checking.model().set_data(checking_report)
+        self.cf_checking.model().requery()
         return report
 
-
-
-    def headerData(self, section: int, orientation: Qt.Orientation, role: int = Qt.ItemDataRole.DisplayRole):
-        if orientation == Qt.Orientation.Horizontal:
-            if role == Qt.ItemDataRole.DisplayRole:
-                value = self.DATA.columns[section]
-                return self._format_value(value, role)
-            return None
-        elif orientation == Qt.Orientation.Vertical:
-            if role == Qt.ItemDataRole.DisplayRole:
-                value = self.DATA.index[section]
-                return self._format_value(value, role)
-            # This works on Linux, but does not work on Windows
-            # elif role == Qt.ItemDataRole.BackgroundRole:
-            #     if self.FORMAT.iloc[section] == 2:  # Totals
-            #         return QBrush(Qt.GlobalColor.darkBlue)
-            #     elif self.FORMAT.iloc[section] == 3: # Balances
-            #         return QBrush(Qt.GlobalColor.darkCyan)
-            #     return None
-            return None
-        return None
 
     def _format_background(self, index, role=Qt.ItemDataRole.BackgroundRole):
         def_type = self.FORMAT.iloc[index.row()]
@@ -734,27 +768,11 @@ class CashFlowReportModel(ATableModel):
 
         return None
 
-class CheckingReportTable(ATable):
-    def __init__(self, requery_method, parent=None):
-        super().__init__(parent)
-        self.requery_method = requery_method
-
-    def action_requery(self):
-        self.requery_method()
-
-class CheckingReportModel(ATableModel):
-    def __init__(self, table, engine, cashflow_model):
-        super().__init__(table, engine)
-        self.cashflow_model = cashflow_model
 
 
-    def _do_requery(self):
-        df = self.cashflow_model.checking_report
-        df.columns = ["Periods", "NP ID", "NP nosaukums", "Fakts ieņēmumi", "Fakts maksājumi",
-                                        "Sagaidāmie ieņēmumi", "Sagaidāmie maksājumi",
-                                        "Budžeta ieņēmumi", "Budžeta maksājumi", "Fakts plus sagaidāmie ieņēmumi",
-                                        "Fakts plus sagaidāmie maksājumi",
-                                        "Ieņēmumi", "Maksājumi", "Neto naudas plūsma"]
 
-        return df
-
+if __name__ == "__main__":
+    from CashFlow import CashFlowApp
+    app = CashFlowApp(sys.argv)
+    app.open_Form(CashFlowReport(app.engine), "Naudas plūsma")
+    app.exec()

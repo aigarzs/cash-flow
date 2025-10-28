@@ -54,10 +54,10 @@ class ATable(QTableView):
 
 class ATableModel(QAbstractTableModel):
     # Populated by requery(), updated by setData
-    DATA = pd.DataFrame()
+    DATA = pd.DataFrame({})
     # Optional way of formatting.
     # You may get flags() and / or _format_background() from data in self.FORMAT
-    FORMAT = pd.DataFrame()
+    FORMAT = pd.DataFrame({})
     # Free format library, set by set_filter(...), used by _do_requery()
     FILTER = {}
 
@@ -239,7 +239,7 @@ class ATableModel(QAbstractTableModel):
                 header = None
 
         # self.logger.debug(f"headerData section-{section} orientation-{orientation} : {header}")
-        return header
+        return self._format_value(header, role)
 
     def data(self, index, role=Qt.ItemDataRole.DisplayRole):
         # self.logger.debug(f"data @ {(index.row(), index.column())} , Role {str(role)}")

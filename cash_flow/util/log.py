@@ -1,11 +1,13 @@
 import sys
 import csv
 import logging
+import threading
 from datetime import datetime
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QPushButton, QTextEdit
 )
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QThread
+
 
 class CSVFileHandler(logging.Handler):
     """Custom logging handler that writes logs in CSV format."""
@@ -17,19 +19,20 @@ class CSVFileHandler(logging.Handler):
         try:
             with open(self.filename, "x", newline="", encoding="utf-8") as f:
                 writer = csv.writer(f)
-                writer.writerow(["timestamp", "level", "name", "message"])
+                writer.writerow(["timestamp", "level", "thread", "name", "message"])
         except FileExistsError:
             pass  # file already exists, no need to rewrite header
 
     def emit(self, record):
         timestamp = datetime.fromtimestamp(record.created).strftime("%Y-%m-%d %H:%M:%S")
         level = record.levelname
+        thread = threading.currentThread().getName()
         name = record.name
         message = record.getMessage()
 
         with open(self.filename, "a", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
-            writer.writerow([timestamp, level, name, message])
+            writer.writerow([timestamp, level, thread, name, message])
 
 class QTextEditHandler(logging.Handler):
     """A logging handler that writes log messages to a QTextEdit."""
@@ -54,10 +57,10 @@ def get_logger(name=None):
     logger.setLevel(logLevel)
     logger.handlers.clear()
     stdout_handler = logging.StreamHandler(sys.stdout)
-    formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(name)s - %(message)s")
+    formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(threadName)s - %(name)s - %(message)s")
     stdout_handler.setFormatter(formatter)
     logger.addHandler(stdout_handler)
-    csv_handler = CSVFileHandler("../../log/app_log.csv")
+    csv_handler = CSVFileHandler("app_log.csv")
     logger.addHandler(csv_handler)
     return logger
 

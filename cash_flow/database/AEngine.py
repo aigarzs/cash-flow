@@ -5,7 +5,7 @@ from cash_flow.database.Model import Source
 from cash_flow.util.Settings import engine_echo
 
 def create_engine_db():
-    engine_db = create_engine("sqlite:///../../data/database.db", echo=engine_echo)
+    engine_db = create_engine("sqlite:///database.db", echo=engine_echo)
     return engine_db
 
 def create_engine_jumis():
