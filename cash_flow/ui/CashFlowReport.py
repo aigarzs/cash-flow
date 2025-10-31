@@ -5,7 +5,7 @@ from datetime import date, datetime
 from PyQt6.QtCore import Qt, QModelIndex
 from PyQt6.QtGui import QBrush, QColor, QIcon
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QDateEdit, QLabel, QComboBox, QPushButton, QFileDialog, \
-    QTabWidget, QCheckBox, QApplication, QStackedWidget
+    QTabWidget, QCheckBox, QApplication, QStackedWidget, QFrame
 
 import pandas as pd
 import numpy as np
@@ -40,11 +40,17 @@ class CashFlowReport(QWidget):
 
         vbox = QVBoxLayout()
 
+        self.pane_filter = QFrame()
+        self.filter_visible = True
+        self.btn_filter = QPushButton("Filtrs  (noslēpt)")
+        self.btn_filter.setStyleSheet("font-weight: bold")
+        self.btn_filter.setMaximumWidth(150)
+        self.btn_filter.clicked.connect(self.toggle_filter)
+
+        filterbox = QVBoxLayout()
         filterbox_from = QHBoxLayout()
         filterbox_through = QHBoxLayout()
         filterbox_freq = QHBoxLayout()
-        label_filter = QLabel("Filtrs")
-        label_filter.setStyleSheet("font-weight: bold")
         label_dateFrom = QLabel("No datuma")
         self.filter_dateFrom = QDateEdit()
         self.filter_dateFrom.setCalendarPopup(True)
@@ -75,6 +81,11 @@ class CashFlowReport(QWidget):
         self.filter_Frequency.currentIndexChanged.connect(self.requery)
         filterbox_freq.addWidget(label_freq)
         filterbox_freq.addWidget(self.filter_Frequency)
+
+        filterbox.addLayout(filterbox_from)
+        filterbox.addLayout(filterbox_through)
+        filterbox.addLayout(filterbox_freq)
+        self.pane_filter.setLayout(filterbox)
 
         graph_widget = QWidget()
         graph_layout = QVBoxLayout(self)
@@ -149,10 +160,8 @@ class CashFlowReport(QWidget):
         tabs.addTab(graph_widget, "Naudas plūsmas grafiks")
         tabs.addTab(self.checkreport_stacked, "Pārbaudes atskaite")
 
-        vbox.addWidget(label_filter)
-        vbox.addLayout(filterbox_from)
-        vbox.addLayout(filterbox_through)
-        vbox.addLayout(filterbox_freq)
+        vbox.addWidget(self.btn_filter)
+        vbox.addWidget(self.pane_filter)
         vbox.addWidget(tabs)
         self.setLayout(vbox)
         self.requery()
@@ -256,6 +265,10 @@ class CashFlowReport(QWidget):
         if file_path:
             self.canvas.figure.savefig(file_path, format='jpg')
 
+    def toggle_filter(self):
+        self.filter_visible = not self.filter_visible
+        self.pane_filter.setVisible(self.filter_visible)
+        self.btn_filter.setText("Filtrs  (noslēpt)" if self.filter_visible else "Filtrs  (parādīt)")
 
     def toggle_legend(self, state):
         if state == Qt.CheckState.Checked.value:

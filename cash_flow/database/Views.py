@@ -122,7 +122,10 @@ def view_cash_corresponding(connection):
                     gl.account AS account,
                     a.type_id AS account_type,
                     gl.amount AS amount,
-                    gl.amount_LC AS amount_LC 
+                    gl.amount_LC AS amount_LC,
+                    gl.cleared_amount AS cleared_amount,
+                    gl.date_cleared AS date_cleared,
+                    gl.cleared AS cleared
                 FROM G01_CashTransactions AS cash 
                 LEFT JOIN D03_GeneralLedger AS gl 
                 ON cash.d_id = gl.document_id AND cash.id <> gl.id

@@ -7,7 +7,8 @@ from pandas._libs.tslibs.timestamps import Timestamp
 import pandas.api.types as ptypes
 
 import numpy as np
-from PyQt6.QtCore import QAbstractTableModel, Qt, QModelIndex, QMetaObject, QObject, pyqtSignal, QThread, pyqtSlot
+from PyQt6.QtCore import QAbstractTableModel, Qt, QModelIndex, QMetaObject, QObject, pyqtSignal, QThread, pyqtSlot, \
+    QTimer
 from PyQt6.QtGui import QBrush, QColor
 from PyQt6.QtWidgets import QTableView, QHeaderView, QMenu
 from sqlalchemy.orm import Session
@@ -64,6 +65,9 @@ class ATableModel(QAbstractTableModel):
     EMPTY_ROW_AT_BOTTOM = False
 
     lock = threading.Lock()
+    lock_reset_model = threading.Lock()
+
+    jobs = []
 
     def __init__(self, table: ATable, engine: Engine):
         super().__init__(table)
@@ -170,37 +174,43 @@ class ATableModel(QAbstractTableModel):
         self.requery()
 
     def requery(self):
-        self.thread = QThread()
-        self.worker = RequeryWorker(self)
-        self.worker.moveToThread(self.thread)
+        thread = QThread()
+        worker = RequeryWorker(self)
+        worker.moveToThread(thread)
 
-        self.thread.started.connect(self.worker.run)
-        self.worker.finished.connect(self.on_requery_finished)
-        self.worker.finished.connect(self.thread.quit)
-        self.worker.finished.connect(self.worker.deleteLater)
-        self.thread.finished.connect(self.thread.deleteLater)
+        thread.started.connect(worker.run)
+        worker.finished.connect(self.on_requery_finished)
+        worker.finished.connect(thread.quit)
+        worker.finished.connect(worker.deleteLater)
+        thread.finished.connect(thread.deleteLater)
+
+        with self.lock:
+            self.jobs.append((thread, worker))
+
+        thread.start()
 
         self.logger.debug(f"Requery start")
-
-        self.thread.start()
 
 
 
 
     @pyqtSlot(pd.DataFrame)
     def on_requery_finished(self, df):
-        self.logger.debug(f"_on_requery completed")
-        self.beginResetModel()
+        self.logger.debug(f"on_requery_finished")
 
-        with self.lock:
-            self.DATA = df
-            # self.logger.debug("Data types:\n", self.DATA.dtypes)
-            # self.logger.debug(f"Shape: {self.DATA.shape}")
-            # self.logger.debug(f"Columns: {self.DATA.columns}")
-            # self.logger.debug("Data:\n", self.DATA.head())
-            shape = self.DATA.shape
+        with self.lock_reset_model:
+            self.beginResetModel()
+            with self.lock:
+                self.DATA = df
+                # self.logger.debug("Data types:\n", self.DATA.dtypes)
+                # self.logger.debug(f"Shape: {self.DATA.shape}")
+                # self.logger.debug(f"Columns: {self.DATA.columns}")
+                # self.logger.debug("Data:\n", self.DATA.head())
+                shape = self.DATA.shape
+                # This crashes app
+                # self.jobs = [(t, w) for (t, w) in self.jobs if not t.isFinished()]
+            self.endResetModel()
 
-        self.endResetModel()
         self.logger.info(f"Requery finished. Shape: {shape}")
 
 

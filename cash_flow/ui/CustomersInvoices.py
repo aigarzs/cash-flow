@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from cash_flow.database.Model import Document, DocType, AccountType, GeneralLedger_preserved
 from cash_flow.ui.AWidgets import ATable, ATableModel
+from cash_flow.ui.ComboDefinition import ComboDefinition
 from cash_flow.util.Converters import str_to_date, str_to_priority
 
 
@@ -33,12 +34,10 @@ class CustomersInvoices(QWidget):
         filterbox_line7 = QHBoxLayout()
 
         label_cf_def = QLabel("NP Pozīcija")
-        self.filter_cf_definition = QComboBox()
+        self.filter_cf_definition = ComboDefinition(self.engine, allow_empty=True)
+        self.filter_cf_definition.currentIndexChanged.connect(self.requery)
         definition = pd.read_sql_query("SELECT id, key, name FROM E01_CashFlowDefinition WHERE definition_type = 1 ORDER BY key",
                                        self.engine)
-        self.filter_cf_definition.addItem("")
-        self.filter_cf_definition.addItems(definition["name"])
-        self.filter_cf_definition.currentIndexChanged.connect(self.requery)
         self.dict_cf_definition = dict(zip(definition['name'], definition['id']))
         filterbox_line1.addWidget(label_cf_def)
         filterbox_line1.addWidget(self.filter_cf_definition)
@@ -184,10 +183,10 @@ class CustomersInvoices(QWidget):
         self.btn_details.setMaximumWidth(150)
         self.btn_details.clicked.connect(self.toggle_details)
         self.pane_details = QFrame()
+        self.pane_details.setMaximumHeight(250)
         self.details_visible = False
         box_details = QVBoxLayout()
         tabs_details = QTabWidget()
-        tabs_details.setMaximumHeight(250)
         tabs_details.addTab(self.invoice_accounts, "Kontējumi")
         tabs_details.addTab(self.invoice_clearing, "Apmaksa")
         self.pane_details.setLayout(box_details)
@@ -372,8 +371,10 @@ class CustomersInvoicesModel(ATableModel):
         invoices["p_date"] = pd.to_datetime(invoices["p_date"], format="mixed")
         invoices["date_cleared"] = pd.to_datetime(invoices["date_cleared"])
         invoices["cleared"] = invoices["cleared"].astype(bool)
-        invoices["void"] = invoices["void"].fillna(False).astype(bool)
-        invoices["priority"] = invoices["priority"].fillna(100).astype(int)
+        invoices["void"] = invoices["void"].fillna(False)
+        invoices["void"] = invoices["void"].infer_objects(copy=False).astype(bool)
+        invoices["priority"] = invoices["priority"].fillna(100)
+        invoices["priority"] = invoices["priority"].infer_objects(copy=False).astype(int)
 
 
         if filter.get("filter docdate"):

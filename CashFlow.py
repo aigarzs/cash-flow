@@ -1,6 +1,7 @@
 
 import sys
 
+import pandas as pd
 from PyQt6 import QtCore, QtWidgets
 from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QSplitter, QToolBox, QPushButton, \
     QTabWidget
@@ -35,6 +36,7 @@ class CashFlowApp(QApplication):
         self.logger.info(f"Log level={logLevel}")
         self.logger.info("******** pandas settings ********")
         self.logger.info(f"pd.options.mode.copy_on_write={pd.options.mode.copy_on_write}")
+        self.logger.info(f"pd.set_option('future.no_silent_downcasting', {pd.get_option('future.no_silent_downcasting')})")
         self.logger.info("******** alchemy settings ********")
         self.logger.info(f"Engine echo={engine_echo}")
         self.logger.info("************ EOF settings *****************")

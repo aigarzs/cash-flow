@@ -58,7 +58,7 @@ class VendorsModel(ATableModel):
             dataset = session.execute(stmt).all()
 
             # Convert to DataFrame
-            df = pd.DataFrame(dataset, columns=["id", "Nosaukums", "Prioritāte", "Anulēts"])
+            df = pd.DataFrame(dataset, columns=["id", "Nosaukums", "Prioritāte", "Anulēt"])
             df.set_index("id", inplace=True)
             return df
 
@@ -68,7 +68,7 @@ class VendorsModel(ATableModel):
     def flags(self, index):
         if index.column() == self.get_column_index("Prioritāte"):
             return Qt.ItemFlag.ItemIsEditable | super().flags(index)
-        elif index.column() == self.get_column_index("Anulēts"):
+        elif index.column() == self.get_column_index("Anulēt"):
             return Qt.ItemFlag.ItemIsUserCheckable | super().flags(index)
         else:
             return super().flags(index)
@@ -87,7 +87,7 @@ class VendorsModel(ATableModel):
                     session.commit()
                     self.DATA.iloc[index.row(), index.column()] = value
                     return True
-                elif index.column() == self.get_column_index("Anulēts"):
+                elif index.column() == self.get_column_index("Anulēt"):
                     checked = value == 2  # Qt.CheckState.Checked
                     vendor.cr_void = checked
                     session.commit()
